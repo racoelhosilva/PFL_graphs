@@ -1,3 +1,5 @@
+module TP1 where
+
 --import qualified Data.List
 --import qualified Data.Array
 --import qualified Data.Bits
@@ -13,7 +15,7 @@ type Distance = Int
 type RoadMap = [(City,City,Distance)]
 
 cities :: RoadMap -> [City]
-cities = undefined -- modifiy this line to implement the solution, for each exercise not solved, leave the function definition like this
+cities = undefined -- modify this line to implement the solution, for each exercise not solved, leave the function definition like this
 
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent = undefined
