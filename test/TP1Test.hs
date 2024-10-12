@@ -1,4 +1,6 @@
-import Control.Monad (when)
+{- HLINT ignore "Use camelCase" -}
+
+import Control.Monad (unless)
 import Test.QuickCheck (quickCheckResult)
 import Test.QuickCheck.Test (isSuccess)
 import System.Exit (exitFailure)
@@ -11,10 +13,10 @@ prep_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ revers
 prep_reverseInvolution :: [Int] -> Bool 
 prep_reverseInvolution xs = reverse (reverse xs) == xs
 
-main :: IO()
+main :: IO ()
 main = do
   let tests = [ quickCheckResult prep_reverseAntiAssociativity
               , quickCheckResult prep_reverseInvolution
               ]
   success <- fmap (all isSuccess) . sequence $ tests
-  when (not success) $ exitFailure
+  unless success exitFailure
