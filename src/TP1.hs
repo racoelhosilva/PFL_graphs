@@ -14,11 +14,17 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
+-- TODO: Can edges be self-loops?
+toDirected :: RoadMap -> RoadMap
+toDirected roadMap = roadMap ++ [(dest, orig, dist) | (orig, dest, dist) <- roadMap, orig /= dest]
+
 cities :: RoadMap -> [City]
 cities = undefined -- modify this line to implement the solution, for each exercise not solved, leave the function definition like this
 
 areAdjacent :: RoadMap -> City -> City -> Bool
-areAdjacent = undefined
+areAdjacent roadMap city1 city2 = any connectsCities $ toDirected roadMap where
+  connectsCities :: (City, City, Distance) -> Bool
+  connectsCities (orig, dest, _) = (orig, dest) == (city1, city2)
 
 distance :: RoadMap -> City -> City -> Maybe Distance
 distance = undefined
