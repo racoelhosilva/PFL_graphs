@@ -1,22 +1,20 @@
 {- HLINT ignore "Use camelCase" -}
 
-import Control.Monad (unless)
-import Test.QuickCheck (quickCheckResult)
-import Test.QuickCheck.Test (isSuccess)
-import System.Exit (exitFailure)
+import Test.Hspec
+import Test.Hspec.QuickCheck
 
 import TP1
 
-prep_reverseAntiAssociativity :: [Int] -> [Int] -> Bool
-prep_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ reverse xs
+prop_reverseAntiAssociativity :: [Int] -> [Int] -> Bool
+prop_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ reverse xs
 
-prep_reverseInvolution :: [Int] -> Bool 
-prep_reverseInvolution xs = reverse (reverse xs) == xs
+prop_reverseInvolution :: [Int] -> Bool 
+prop_reverseInvolution xs = reverse (reverse xs) == xs
 
 main :: IO ()
-main = do
-  let tests = [ quickCheckResult prep_reverseAntiAssociativity
-              , quickCheckResult prep_reverseInvolution
-              ]
-  success <- fmap (all isSuccess) . sequence $ tests
-  unless success exitFailure
+main = hspec $ do
+  describe "reverse" $ do
+    prop "reverse is anti-associative"
+     prop_reverseAntiAssociativity
+    prop "reverse is an involution"
+      prop_reverseInvolution

@@ -36,4 +36,4 @@ test-suite feup-pfl1-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          TP1Test.hs
-    build-depends:    base, QuickCheck, feup-pfl1
+    build-depends:    base, hspec, feup-pfl1
