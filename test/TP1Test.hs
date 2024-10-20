@@ -35,6 +35,7 @@ prop_reverseInvolution xs = reverse (reverse xs) == xs
 
 prop_citiesWithoutDuplicates :: Property
 prop_citiesWithoutDuplicates = forAll goodRoadMap $ \roadMap -> allUnique $ cities roadMap where
+  allUnique :: Eq a => [a] -> Bool 
   allUnique [] = True
   allUnique (x:xs) = x `notElem` xs && allUnique xs
 
@@ -44,6 +45,23 @@ prop_areAdjacentCommutativity =
   forAll goodCity $ \city1 ->
   forAll goodCity $ \city2 ->
     areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
+
+prop_distanceCommutativity :: Property
+prop_distanceCommutativity =
+  forAll goodRoadMap $ \roadMap ->
+  forAll goodCity $ \city1 ->
+  forAll goodCity $ \city2 ->
+    distance roadMap city1 city2 == distance roadMap city2 city1
+
+prop_distanceAdjacency :: Property
+prop_distanceAdjacency =
+  forAll goodRoadMap $ \roadMap ->
+  forAll goodCity $ \city1 ->
+  forAll goodCity $ \city2 ->
+    let adjacent = areAdjacent roadMap city1 city2
+    in case distance roadMap city1 city2 of
+      Nothing -> not adjacent
+      Just _  -> adjacent
 
 -- Main
 
@@ -78,3 +96,21 @@ main = hspec $ do
 
     prop "areAdjacent is commutative" $ do
       prop_areAdjacentCommutativity
+
+  describe "distance" $ do 
+    it "Right distances are given" $ do 
+      distance gTest1 "7" "6" `shouldBe` Just 1
+      distance gTest1 "3" "2" `shouldBe` Just 7
+      distance gTest2 "3" "1" `shouldBe` Just 25
+      distance gTest3 "2" "3" `shouldBe` Just 2
+
+    it "Nothing is given for non existing edges" $ do 
+      distance gTest1 "6" "0" `shouldBe` Nothing
+      distance gTest1 "0" "A" `shouldBe` Nothing
+      distance gTest3 "0" "2" `shouldBe` Nothing
+
+    prop "distance is commutative" $ do 
+      prop_distanceCommutativity
+
+    prop "distance relates to areAdjacent" $ do
+      prop_distanceAdjacency

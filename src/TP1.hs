@@ -42,7 +42,9 @@ areAdjacent roadMap city1 city2 = any connectsCities roadMap where
   connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
 distance :: RoadMap -> City -> City -> Maybe Distance
-distance roadMap city1 city2 = undefined
+distance roadMap city1 city2 = if null match then Nothing else Just (head match)
+  where 
+    match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent = undefined
