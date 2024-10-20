@@ -1,6 +1,6 @@
 module TP1 where
 
---import qualified Data.List
+import qualified Data.List
 --import qualified Data.Array
 --import qualified Data.Bits
 
@@ -14,20 +14,35 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
--- TODO: Can edges be self-loops?
-toDirected :: RoadMap -> RoadMap
-toDirected roadMap = roadMap ++ [(dest, orig, dist) | (orig, dest, dist) <- roadMap, orig /= dest]
+-- -- TODO: Can edges be self-loops?
+-- toDirected :: RoadMap -> RoadMap
+-- toDirected roadMap = roadMap ++ [(dest, orig, dist) | (orig, dest, dist) <- roadMap, orig /= dest]
+
+uniq :: Eq a => [a] -> [a]
+uniq [] = []
+uniq [x] = [x]
+uniq (x1:x2:xs)
+  | x1 == x2  = uniq (x2:xs)
+  | otherwise = x1 : uniq (x2:xs)
+
+sortUniq :: Ord a => [a] -> [a]
+sortUniq xs = uniq $ Data.List.sort xs 
 
 cities :: RoadMap -> [City]
-cities = undefined -- modify this line to implement the solution, for each exercise not solved, leave the function definition like this
+cities [] = []
+cities r = sortUniq $ citySelect r
+  where 
+    citySelect :: RoadMap -> [City]
+    citySelect [] = []
+    citySelect ((a, b, _):xs) = a : b : citySelect xs
 
 areAdjacent :: RoadMap -> City -> City -> Bool
-areAdjacent roadMap city1 city2 = any connectsCities $ toDirected roadMap where
+areAdjacent roadMap city1 city2 = any connectsCities roadMap where
   connectsCities :: (City, City, Distance) -> Bool
-  connectsCities (orig, dest, _) = (orig, dest) == (city1, city2)
+  connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
 distance :: RoadMap -> City -> City -> Maybe Distance
-distance = undefined
+distance roadMap city1 city2 = undefined
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent = undefined

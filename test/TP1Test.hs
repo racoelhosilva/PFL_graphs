@@ -4,13 +4,15 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
+import Data.List 
+
 import TP1
 
 
 -- Generators
 
 goodCity :: Gen City
-goodCity = elements [show c | c <- ['A'..'I']]
+goodCity = elements [[c] | c <- ['A'..'I']]
 
 goodEdge :: Gen (City, City, Distance)
 goodEdge = do
@@ -30,13 +32,18 @@ prop_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ revers
 prop_reverseInvolution :: [Int] -> Bool 
 prop_reverseInvolution xs = reverse (reverse xs) == xs
 
+
+prop_citiesWithoutDuplicates :: Property
+prop_citiesWithoutDuplicates = forAll goodRoadMap $ \roadMap -> allUnique $ cities roadMap where
+  allUnique [] = True
+  allUnique (x:xs) = x `notElem` xs && allUnique xs
+
 prop_areAdjacentCommutativity :: Property
 prop_areAdjacentCommutativity =
   forAll goodRoadMap $ \roadMap ->
   forAll goodCity $ \city1 ->
   forAll goodCity $ \city2 ->
     areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
-
 
 -- Main
 
@@ -47,6 +54,15 @@ main = hspec $ do
       prop_reverseAntiAssociativity
     prop "reverse is an involution"
       prop_reverseInvolution
+
+  describe "cities" $ do
+    it "Right cities are listed" $ do
+      sort (cities gTest1) `shouldBe` map show [0..8]
+      sort (cities gTest2) `shouldBe` map show [0..3]
+      sort (cities gTest3) `shouldBe` map show [0..3]
+
+    prop "cities do not list duplicated"
+      prop_citiesWithoutDuplicates 
 
   describe "areAdjacent" $ do 
     it "Right pairs are accepted" $ do
