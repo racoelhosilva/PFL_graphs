@@ -63,6 +63,13 @@ prop_distanceAdjacency =
       Nothing -> not adjacent
       Just _  -> adjacent
 
+prop_adjacentDistance :: Property
+prop_adjacentDistance =
+  forAll goodRoadMap $ \roadMap ->
+  forAll goodCity $ \city1 ->
+    let adjacents = adjacent roadMap city1
+    in all (\(city2, dist) -> distance roadMap city1 city2 == Just dist) adjacents
+
 -- Main
 
 main :: IO ()
@@ -114,3 +121,15 @@ main = hspec $ do
 
     prop "distance relates to areAdjacent" $ do
       prop_distanceAdjacency
+
+  describe "adjacent" $ do 
+    it "Right adjacent cities are given" $ do
+      sort (adjacent gTest1 "7") `shouldBe` [("0", 8), ("1", 11), ("6", 1), ("8", 7)]
+      sort (adjacent gTest1 "3") `shouldBe` [("2", 7), ("4", 9), ("5", 14)]
+      sort (adjacent gTest2 "3") `shouldBe` [("0", 20), ("1", 25), ("2", 30)]
+      sort (adjacent gTest3 "2") `shouldBe` [("3", 2)]
+
+    -- TODO: Fix this
+    -- prop "Adjacent cities have right distances" $ do 
+    --   prop_adjacentDistance
+

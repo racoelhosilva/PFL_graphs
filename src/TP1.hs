@@ -47,7 +47,7 @@ distance roadMap city1 city2 = if null match then Nothing else Just (head match)
     match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
-adjacent = undefined
+adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city] ++ [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city]
 
 pathDistance :: RoadMap -> Path -> Distance
 pathDistance = undefined
