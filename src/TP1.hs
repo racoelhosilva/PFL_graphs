@@ -1,8 +1,8 @@
 module TP1 where
 
 import qualified Data.List
---import qualified Data.Array
---import qualified Data.Bits
+-- import qualified Data.Array
+-- import qualified Data.Bits
 
 -- PFL 2024/2025 Practical assignment 1
 
@@ -13,6 +13,8 @@ type Path = [City]
 type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
+
+type AdjList = [(City,[(City,Distance)])]
 
 -- -- TODO: Can edges be self-loops?
 -- toDirected :: RoadMap -> RoadMap
@@ -26,37 +28,103 @@ uniq (x1:x2:xs)
   | otherwise = x1 : uniq (x2:xs)
 
 sortUniq :: Ord a => [a] -> [a]
-sortUniq xs = uniq $ Data.List.sort xs 
+sortUniq xs = uniq $ Data.List.sort xs
 
 cities :: RoadMap -> [City]
 cities [] = []
 cities r = sortUniq $ citySelect r
-  where 
+  where
     citySelect :: RoadMap -> [City]
     citySelect [] = []
     citySelect ((a, b, _):xs) = a : b : citySelect xs
 
 areAdjacent :: RoadMap -> City -> City -> Bool
-areAdjacent roadMap city1 city2 = any connectsCities roadMap where
-  connectsCities :: (City, City, Distance) -> Bool
-  connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
+areAdjacent roadMap city1 city2 = any connectsCities roadMap
+  where
+    connectsCities :: (City, City, Distance) -> Bool
+    connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
 distance :: RoadMap -> City -> City -> Maybe Distance
 distance roadMap city1 city2 = if null match then Nothing else Just (head match)
-  where 
+  where
     match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
+
+merge :: Ord a => [a] -> [a] -> [a]
+merge xs [] = xs
+merge [] ys = ys
+merge (x:xs) (y:ys)
+  | x <= y    = x : merge xs (y:ys)
+  | otherwise = y : merge (x:xs) ys
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city] ++ [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city]
 
-pathDistance :: RoadMap -> Path -> Distance
-pathDistance = undefined
+pathDistance :: RoadMap -> Path -> Maybe Distance
+pathDistance _ [] = Nothing
+pathDistance roadMap path = sum <$> sequence distances
+  where
+    consecutivePairs :: [(City, City)]
+    consecutivePairs = zip path (tail path)
+
+    distances :: [Maybe Distance]
+    distances = map (uncurry $ distance roadMap) consecutivePairs
 
 rome :: RoadMap -> [City]
-rome = undefined
+rome roadMap = map fst (filter (\(c,d) -> d == maxDegree) degrees)
+  where
+    degrees :: [(City, Int)]
+    degrees = [(city, length (adjacent roadMap city)) | city <- cities roadMap]
+    maxDegree :: Int
+    maxDegree = maximum (map snd degrees)
+
+toAdjList :: RoadMap -> AdjList
+toAdjList roadMap = [(city, adjacent roadMap city) | city <- cities roadMap]
+
+adjacent' :: AdjList -> City -> [(City,Distance)]
+adjacent' adjList city = case lookup city adjList of
+  (Just adj) -> adj
+  Nothing    -> []
+
+dfs :: AdjList -> City -> [Bool]
+dfs adjList root = dfsVisit visitedList root
+  where
+    visitedList :: [Bool]
+    visitedList = [False | _ <- adjList]
+
+    setVisited :: AdjList -> City -> [Bool] -> [Bool]
+    setVisited [] _ _ = []
+    setVisited ((city,_):subAdjList) targetCity (visited:subVisitedList)
+      | city == targetCity = True : subVisitedList
+      | otherwise          = visited : setVisited subAdjList targetCity subVisitedList
+
+    getUnvisitedAdjs :: AdjList -> [(City,Distance)] -> [Bool] -> [City]
+    getUnvisitedAdjs _ [] _ = []
+    getUnvisitedAdjs ((city,_):subAdjList) ((adj,dist):adjacents) (visited:subVisitedList)
+      | city < adj  = getUnvisitedAdjs subAdjList ((adj,dist):adjacents) subVisitedList
+      | not visited = city : getUnvisitedAdjs subAdjList adjacents subVisitedList
+      | otherwise   = getUnvisitedAdjs subAdjList adjacents subVisitedList
+
+    dfsVisit :: [Bool] -> City -> [Bool]
+    dfsVisit visitedList root = foldl dfsVisit nextVisitedList unvisitedAdjs
+      where
+        nextVisitedList :: [Bool]
+        nextVisitedList = setVisited adjList root visitedList
+
+        adjs :: [(City,Distance)]
+        adjs = adjacent' adjList root
+
+        unvisitedAdjs :: [City]
+        unvisitedAdjs = getUnvisitedAdjs adjList adjs visitedList
+
 
 isStronglyConnected :: RoadMap -> Bool
-isStronglyConnected = undefined
+isStronglyConnected roadMap = and $ dfs adjList root
+  where
+    adjList :: AdjList
+    adjList = toAdjList roadMap
+
+    root :: City
+    root = fst $ head adjList
 
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath = undefined

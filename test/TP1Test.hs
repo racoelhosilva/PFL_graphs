@@ -16,16 +16,31 @@ goodCity = elements [[c] | c <- ['A'..'I']]
 
 goodEdge :: Gen (City, City, Distance)
 goodEdge = do
-  orig <- goodCity
-  dest <- goodCity
-  dist <- arbitrary `suchThat` (> 0)
-  return (orig, dest, dist)
+  orig <- goodCity;
+  dest <- goodCity `suchThat` (/= orig);
+  dist <- arbitrary `suchThat` (> 0);
+  return (orig, dest, dist);
+
+goodPath :: RoadMap -> Gen Path
+goodPath roadMap = shuffle (cities roadMap) >>= sublistOf
+  
 
 goodRoadMap :: Gen RoadMap 
-goodRoadMap = listOf goodEdge
+goodRoadMap = do 
+  rawMap <- listOf goodEdge;
+  return $ removeDuplicates rawMap where
+    sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool 
+    sameEdge (orig, dest, _) (orig', dest', _) = (orig, dest) == (orig', dest') || (orig, dest) == (dest', orig')
+
+    removeDuplicates :: RoadMap -> RoadMap
+    removeDuplicates [] = []
+    removeDuplicates (edge:edges) 
+      | any (sameEdge edge) edges = removeDuplicates edges
+      | otherwise                 = edge : removeDuplicates edges
 
 
 -- Property-based tests
+
 prop_reverseAntiAssociativity :: [Int] -> [Int] -> Bool
 prop_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ reverse xs
 
@@ -70,6 +85,15 @@ prop_adjacentDistance =
     let adjacents = adjacent roadMap city1
     in all (\(city2, dist) -> distance roadMap city1 city2 == Just dist) adjacents
 
+prop_pathDistanceDistributivity :: Property
+prop_pathDistanceDistributivity =
+  forAll goodRoadMap $ \roadMap ->
+  forAll (goodPath roadMap) $ \path1 ->
+  forAll goodCity $ \middleCity ->
+  forAll (goodPath roadMap) $ \path2 ->
+    pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
+
+
 -- Main
 
 main :: IO ()
@@ -101,7 +125,7 @@ main = hspec $ do
       areAdjacent gTest1 "0" "A" `shouldBe` False
       areAdjacent gTest3 "0" "2" `shouldBe` False
 
-    prop "areAdjacent is commutative" $ do
+    prop "areAdjacent is commutative"
       prop_areAdjacentCommutativity
 
   describe "distance" $ do 
@@ -116,10 +140,10 @@ main = hspec $ do
       distance gTest1 "0" "A" `shouldBe` Nothing
       distance gTest3 "0" "2" `shouldBe` Nothing
 
-    prop "distance is commutative" $ do 
+    prop "distance is commutative"
       prop_distanceCommutativity
 
-    prop "distance relates to areAdjacent" $ do
+    prop "distance relates to areAdjacent"
       prop_distanceAdjacency
 
   describe "adjacent" $ do 
@@ -129,7 +153,39 @@ main = hspec $ do
       sort (adjacent gTest2 "3") `shouldBe` [("0", 20), ("1", 25), ("2", 30)]
       sort (adjacent gTest3 "2") `shouldBe` [("3", 2)]
 
-    -- TODO: Fix this
-    -- prop "Adjacent cities have right distances" $ do 
-    --   prop_adjacentDistance
+    prop "Adjacent cities have right distances"
+      prop_adjacentDistance
 
+  describe "pathDistance" $ do 
+    it "Right path distances are given" $ do
+      pathDistance gTest1 ["7", "6", "5", "2", "1"] `shouldBe` Just 15
+      pathDistance gTest2 ["0", "1", "2", "3"] `shouldBe` Just 75
+      pathDistance gTest3 ["0", "1"] `shouldBe` Just 4
+
+    it "Nothing is returned for disconnected paths" $ do
+      pathDistance gTest1 ["7", "6", "2", "1"] `shouldBe` Nothing
+      pathDistance gTest3 ["0", "1", "2"] `shouldBe` Nothing
+      
+    it "Nothing is returned for small paths" $ do 
+      pathDistance gTest1 ["7"] `shouldBe` Just 0  -- TODO: see this
+      pathDistance gTest1 [] `shouldBe` Nothing
+
+    prop "Distance of concatenation equals sum of distances" $ do
+      prop_pathDistanceDistributivity
+
+  describe "rome" $ do
+    it "City with most roads is returned" $ do 
+      rome gTest1 `shouldBe` ["2", "5", "7"]
+      rome gTest2 `shouldBe` ["0", "1", "2", "3"]
+      rome gTest3 `shouldBe` ["0", "1", "2", "3"]
+
+    it "Rome of empty graph is empty list" $ do
+      rome [] `shouldBe` []
+
+  describe "isStronglyConnected" $ do
+    it "Detects connected maps" $ do
+      isStronglyConnected gTest1 `shouldBe` True
+      isStronglyConnected gTest2 `shouldBe` True
+
+    it "Detects unconnected maps" $ do
+      isStronglyConnected gTest3 `shouldBe` False
