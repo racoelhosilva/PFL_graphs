@@ -57,7 +57,7 @@ merge (x:xs) (y:ys)
   | otherwise = y : merge (x:xs) ys
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
-adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city] ++ [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city]
+adjacent roadMap city = merge (Data.List.sort [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city]) (Data.List.sort [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city])
 
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
