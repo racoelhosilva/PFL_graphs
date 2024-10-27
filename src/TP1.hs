@@ -2,7 +2,7 @@ module TP1 where
 
 import qualified Data.List
 -- import qualified Data.Array
--- import qualified Data.Bits
+import qualified Data.Bits
 
 -- PFL 2024/2025 Practical assignment 1
 
@@ -16,9 +16,26 @@ type RoadMap = [(City,City,Distance)]
 
 type AdjList = [(City,[(City,Distance)])]
 
--- -- TODO: Can edges be self-loops?
--- toDirected :: RoadMap -> RoadMap
--- toDirected roadMap = roadMap ++ [(dest, orig, dist) | (orig, dest, dist) <- roadMap, orig /= dest]
+-- Bitmask
+
+newtype Bitmask = Bitmask Integer
+
+newBitmask :: Bitmask
+newBitmask = Bitmask 0
+
+setBit :: Bitmask -> Int -> Bitmask
+setBit (Bitmask bits) pos = Bitmask (Data.Bits.setBit bits pos)
+
+clearBit :: Bitmask -> Int -> Bitmask
+clearBit (Bitmask bits) pos = Bitmask (Data.Bits.clearBit bits pos)
+
+toggleBit :: Bitmask -> Int -> Bitmask
+toggleBit (Bitmask bits) pos = Bitmask (Data.Bits.complementBit bits pos)
+
+isBitSet :: Bitmask -> Int -> Bool
+isBitSet (Bitmask bits) = Data.Bits.testBit bits
+
+-- cities
 
 uniq :: Eq a => [a] -> [a]
 uniq [] = []
@@ -38,19 +55,27 @@ cities r = sortUniq $ citySelect r
     citySelect [] = []
     citySelect ((a, b, _):xs) = a : b : citySelect xs
 
+-- areAdjacent
+
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent roadMap city1 city2 = any connectsCities roadMap
   where
     connectsCities :: (City, City, Distance) -> Bool
     connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
+-- distance
+
 distance :: RoadMap -> City -> City -> Maybe Distance
 distance roadMap city1 city2 = if null match then Nothing else Just (head match)
   where
     match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
+-- adjacent
+
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city] ++ [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city]
+
+-- pathDistance
 
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
@@ -61,6 +86,8 @@ pathDistance roadMap path = sum <$> sequence distances
 
     distances :: [Maybe Distance]
     distances = map (uncurry $ distance roadMap) consecutivePairs
+
+-- rome
 
 rome :: RoadMap -> [City]
 rome roadMap = map fst (filter (\(c,d) -> d == maxDegree) degrees)
@@ -111,11 +138,15 @@ toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCit
     revAdjs :: [[(City,Distance)]]
     revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
 
+unjust :: Maybe a -> a
+unjust (Just x) = x
+unjust Nothing = undefined
 
 adjacent' :: AdjList -> City -> [(City,Distance)]
-adjacent' adjList city = case lookup city adjList of
-  (Just adj) -> adj
-  Nothing    -> []
+adjacent' adjList city = unjust $ lookup city adjList
+
+getCityIndex :: AdjList -> City -> Int
+getCityIndex roadMap city = unjust $ Data.List.elemIndex city $ map fst roadMap
 
 dfs :: AdjList -> City -> [Bool]
 dfs adjList root = dfsVisit visitedList root
@@ -160,6 +191,8 @@ isStronglyConnected roadMap = and $ dfs adjList root
 
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath = undefined
+
+-- travelSales
 
 travelSales :: RoadMap -> Path
 travelSales = undefined
