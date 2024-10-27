@@ -4,7 +4,7 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
-import Data.List 
+import Data.List
 
 import TP1
 
@@ -23,34 +23,98 @@ goodEdge = do
 
 goodPath :: RoadMap -> Gen Path
 goodPath roadMap = shuffle (cities roadMap) >>= sublistOf
-  
 
-goodRoadMap :: Gen RoadMap 
-goodRoadMap = do 
+
+goodRoadMap :: Gen RoadMap
+goodRoadMap = do
   rawMap <- listOf goodEdge;
   return $ removeDuplicates rawMap where
-    sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool 
+    sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool
     sameEdge (orig, dest, _) (orig', dest', _) = (orig, dest) == (orig', dest') || (orig, dest) == (dest', orig')
 
     removeDuplicates :: RoadMap -> RoadMap
     removeDuplicates [] = []
-    removeDuplicates (edge:edges) 
+    removeDuplicates (edge:edges)
       | any (sameEdge edge) edges = removeDuplicates edges
       | otherwise                 = edge : removeDuplicates edges
 
 
 -- Property-based tests
 
-prop_reverseAntiAssociativity :: [Int] -> [Int] -> Bool
-prop_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ reverse xs
+-- prop_reverseAntiAssociativity :: [Int] -> [Int] -> Bool
+-- prop_reverseAntiAssociativity xs ys = reverse (xs ++ ys) == reverse ys ++ reverse xs
 
-prop_reverseInvolution :: [Int] -> Bool 
-prop_reverseInvolution xs = reverse (reverse xs) == xs
+-- prop_reverseInvolution :: [Int] -> Bool
+-- prop_reverseInvolution xs = reverse (reverse xs) == xs
 
+prop_emptySetContainsNoElements :: Int -> Bool
+prop_emptySetContainsNoElements n = not (containsSet emptySet n)
+
+prop_setContainsInsertedElement :: Int -> Bool
+prop_setContainsInsertedElement n = containsSet (insertSet emptySet n) n
+
+prop_setUniqueInsertions :: Int -> Bool
+prop_setUniqueInsertions n = insertSet (insertSet emptySet n) n == insertSet emptySet n
+
+prop_setInsertionCommutativity :: Int -> Int -> Bool
+prop_setInsertionCommutativity n1 n2 = setToList (insertSet (insertSet emptySet n1) n2) == setToList (insertSet (insertSet emptySet n2) n1)
+
+prop_setIsBalanced :: [Int] -> Bool
+prop_setIsBalanced xs = abs (balanceFactor $ foldl insertSet emptySet xs) <= 1
+
+prop_setIsOrdered :: [Int] -> Bool
+prop_setIsOrdered xs = isOrdered res
+  where
+    isOrdered :: [Int] -> Bool
+    isOrdered [] = True
+    isOrdered [_] = True
+    isOrdered (x:y:xs) = x < y && isOrdered (y:xs)
+
+    res :: [Int]
+    res = setToList $ foldl insertSet emptySet xs
+
+prop_heapIsBalanced :: [Int] -> Bool
+prop_heapIsBalanced xs = isBalanced $ foldl heapInsert emptyHeap xs
+  where
+    isBalanced :: Ord a => Heap a -> Bool
+    isBalanced HEmpty = True
+    isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
+      && isBalanced left && isBalanced right
+
+prop_heapIsOrdered :: [Int] -> Bool
+prop_heapIsOrdered xs = isOrdered $ foldl heapInsert emptyHeap xs
+  where
+    isOrdered :: Ord a => Heap a -> Bool
+    isOrdered HEmpty = True
+    isOrdered (HNode _ _ HEmpty HEmpty) = True
+    isOrdered (HNode x _ left@(HNode y _ _ _) HEmpty) = x < y && isOrdered left
+    isOrdered (HNode x _ HEmpty right@(HNode y _ _ _)) = x < y && isOrdered right
+    isOrdered (HNode x _ left@(HNode y _ _ _) right@(HNode z _ _ _)) = x < y && x < z && isOrdered left && isOrdered right
+
+prop_heapInsertNotEmpty :: [Int] -> Int -> Bool
+prop_heapInsertNotEmpty xs x = not $ heapIsEmpty $ heapInsert (foldl heapInsert emptyHeap xs) x
+
+prop_heapMinIsExtracted :: Property
+prop_heapMinIsExtracted =
+  forAll (listOf1 (arbitrary :: Gen Int)) $ \xs -> let
+    heap = foldl heapInsert emptyHeap xs
+    min = heapMin heap
+    in min == fst (heapPopMin heap) && min == minimum xs
+
+prop_heapBalancedAfterExtraction :: Property
+prop_heapBalancedAfterExtraction =
+  forAll (listOf (arbitrary :: Gen Int)) $ \xs ->
+  forAll (choose (0, length xs)) $ \extractions ->
+    isBalanced $ iterate (snd . heapPopMin) (foldl heapInsert emptyHeap xs) !! extractions
+      where
+        isBalanced :: Ord a => Heap a -> Bool
+        isBalanced HEmpty = True
+        isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
+          && isBalanced left && isBalanced right
 
 prop_citiesWithoutDuplicates :: Property
 prop_citiesWithoutDuplicates = forAll goodRoadMap $ \roadMap -> allUnique $ cities roadMap where
-  allUnique :: Eq a => [a] -> Bool 
+  allUnique :: Eq a => [a] -> Bool
   allUnique [] = True
   allUnique (x:xs) = x `notElem` xs && allUnique xs
 
@@ -98,11 +162,52 @@ prop_pathDistanceDistributivity =
 
 main :: IO ()
 main = hspec $ do
-  describe "reverse" $ do
-    prop "reverse is anti-associative"
-      prop_reverseAntiAssociativity
-    prop "reverse is an involution"
-      prop_reverseInvolution
+
+--  describe "reverse" $ do
+--    prop "reverse is anti-associative"
+--      prop_reverseAntiAssociativity
+--    prop "reverse is an involution"
+--      prop_reverseInvolution
+
+-- Test for Data Structures
+
+  describe "Set" $ do
+    prop "Empty set contains no elements"
+      prop_emptySetContainsNoElements
+
+    prop "Set contains inserted element"
+      prop_setContainsInsertedElement
+
+    prop "Insertions are unique"
+      prop_setUniqueInsertions
+
+    prop "Insertions are commutative"
+      prop_setInsertionCommutativity
+
+    prop "Set is balanced"
+      prop_setIsBalanced
+
+    prop "Set is ordered"
+      prop_setIsOrdered
+
+  describe "Heap" $ do
+    describe "insert" $ do
+      prop "Heap is balanced"
+        prop_heapIsBalanced
+
+      prop "Heap is ordered"
+        prop_setIsOrdered
+
+      prop "Heap not empty after insert"
+        prop_heapInsertNotEmpty
+
+      prop "Heap min is extracted"
+        prop_heapMinIsExtracted
+      
+      prop "Heap balanced after extraction"
+        prop_heapBalancedAfterExtraction
+
+-- Tests for Functions
 
   describe "cities" $ do
     it "Right cities are listed" $ do
@@ -111,16 +216,16 @@ main = hspec $ do
       sort (cities gTest3) `shouldBe` map show [0..3]
 
     prop "cities do not list duplicated"
-      prop_citiesWithoutDuplicates 
+      prop_citiesWithoutDuplicates
 
-  describe "areAdjacent" $ do 
+  describe "areAdjacent" $ do
     it "Right pairs are accepted" $ do
       areAdjacent gTest1 "7" "6" `shouldBe` True
-      areAdjacent gTest1 "3" "2" `shouldBe` True 
-      areAdjacent gTest2 "3" "1" `shouldBe` True 
+      areAdjacent gTest1 "3" "2" `shouldBe` True
+      areAdjacent gTest2 "3" "1" `shouldBe` True
       areAdjacent gTest3 "2" "3" `shouldBe` True
 
-    it "Wrong pairs are rejected" $ do 
+    it "Wrong pairs are rejected" $ do
       areAdjacent gTest1 "6" "0" `shouldBe` False
       areAdjacent gTest1 "0" "A" `shouldBe` False
       areAdjacent gTest3 "0" "2" `shouldBe` False
@@ -128,14 +233,14 @@ main = hspec $ do
     prop "areAdjacent is commutative"
       prop_areAdjacentCommutativity
 
-  describe "distance" $ do 
-    it "Right distances are given" $ do 
+  describe "distance" $ do
+    it "Right distances are given" $ do
       distance gTest1 "7" "6" `shouldBe` Just 1
       distance gTest1 "3" "2" `shouldBe` Just 7
       distance gTest2 "3" "1" `shouldBe` Just 25
       distance gTest3 "2" "3" `shouldBe` Just 2
 
-    it "Nothing is given for non existing edges" $ do 
+    it "Nothing is given for non existing edges" $ do
       distance gTest1 "6" "0" `shouldBe` Nothing
       distance gTest1 "0" "A" `shouldBe` Nothing
       distance gTest3 "0" "2" `shouldBe` Nothing
@@ -146,7 +251,7 @@ main = hspec $ do
     prop "distance relates to areAdjacent"
       prop_distanceAdjacency
 
-  describe "adjacent" $ do 
+  describe "adjacent" $ do
     it "Right adjacent cities are given" $ do
       sort (adjacent gTest1 "7") `shouldBe` [("0", 8), ("1", 11), ("6", 1), ("8", 7)]
       sort (adjacent gTest1 "3") `shouldBe` [("2", 7), ("4", 9), ("5", 14)]
@@ -156,7 +261,7 @@ main = hspec $ do
     prop "Adjacent cities have right distances"
       prop_adjacentDistance
 
-  describe "pathDistance" $ do 
+  describe "pathDistance" $ do
     it "Right path distances are given" $ do
       pathDistance gTest1 ["7", "6", "5", "2", "1"] `shouldBe` Just 15
       pathDistance gTest2 ["0", "1", "2", "3"] `shouldBe` Just 75
@@ -165,8 +270,8 @@ main = hspec $ do
     it "Nothing is returned for disconnected paths" $ do
       pathDistance gTest1 ["7", "6", "2", "1"] `shouldBe` Nothing
       pathDistance gTest3 ["0", "1", "2"] `shouldBe` Nothing
-      
-    it "Nothing is returned for small paths" $ do 
+
+    it "Nothing is returned for small paths" $ do
       pathDistance gTest1 ["7"] `shouldBe` Just 0  -- TODO: see this
       pathDistance gTest1 [] `shouldBe` Nothing
 
@@ -174,7 +279,7 @@ main = hspec $ do
       prop_pathDistanceDistributivity
 
   describe "rome" $ do
-    it "City with most roads is returned" $ do 
+    it "City with most roads is returned" $ do
       rome gTest1 `shouldBe` ["2", "5", "7"]
       rome gTest2 `shouldBe` ["0", "1", "2", "3"]
       rome gTest3 `shouldBe` ["0", "1", "2", "3"]

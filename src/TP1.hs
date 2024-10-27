@@ -35,6 +35,134 @@ toggleBit (Bitmask bits) pos = Bitmask (Data.Bits.complementBit bits pos)
 isBitSet :: Bitmask -> Int -> Bool
 isBitSet (Bitmask bits) = Data.Bits.testBit bits
 
+-- Set implementation based on an AVL Tree
+
+data Set a = SEmpty | SNode a (Set a) (Set a) Int
+  deriving (Show, Eq, Ord)
+
+emptySet :: Set a
+emptySet = SEmpty
+
+height :: Set a -> Int
+height SEmpty = 0
+height (SNode _ _ _ h) = h
+
+updateHeight :: Set a -> Set a
+updateHeight SEmpty = SEmpty
+updateHeight (SNode v l r _) = SNode v l r (1 + max (height l) (height r))
+
+balanceFactor :: Set a -> Int
+balanceFactor SEmpty = 0
+balanceFactor (SNode _ l r _) = height l - height r
+
+rotateRight :: Set a -> Set a
+rotateRight (SNode y (SNode x l lx h2) r h1) = updateHeight $ SNode x l (updateHeight (SNode y lx r h2)) h1
+rotateRight s = s
+
+rotateLeft :: Set a -> Set a
+rotateLeft (SNode x l (SNode y rx r h2) h1) = updateHeight $ SNode y (updateHeight (SNode x l rx h2)) r h1
+rotateLeft s = s
+
+balance :: Set a -> Set a
+balance (SNode val l r h)
+  | bf > 1 && balanceFactor l >= 0  = rotateRight (SNode val l r h)
+  | bf > 1                          = rotateRight (SNode val (rotateLeft l) r h)
+  | bf < -1 && balanceFactor r <= 0 = rotateLeft (SNode val l r h)
+  | bf < -1                         = rotateLeft (SNode val l (rotateRight r) h)
+  | otherwise                       = updateHeight (SNode val l r h)
+  where bf = balanceFactor (SNode val l r h)
+balance s = s
+
+insertSet :: (Ord a) => Set a -> a -> Set a
+insertSet SEmpty newVal = SNode newVal SEmpty SEmpty 1
+insertSet (SNode val l r h) newVal
+  | val > newVal  = balance (SNode val (insertSet l newVal) r h)
+  | val < newVal  = balance (SNode val l (insertSet r newVal) h)
+  | otherwise     = SNode val l r h
+
+containsSet :: (Ord a) => Set a -> a -> Bool
+containsSet SEmpty _ = False
+containsSet (SNode val l r h) target
+  | val > target  = containsSet l target
+  | val < target  = containsSet r target
+  | otherwise   = True
+
+searchSet :: (Ord a) => Set a -> a -> Set a
+searchSet SEmpty _ = SEmpty
+searchSet (SNode val l r h) target
+  | val > target  = searchSet l target
+  | val < target  = searchSet r target
+  | otherwise     = SNode val l r h 
+
+setToList :: Set a -> [a]
+setToList SEmpty = []
+setToList (SNode v l r _) = setToList l ++ [v] ++ setToList r
+
+-- Binary Heap
+
+data Ord a => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
+
+emptyHeap :: Heap a
+emptyHeap = HEmpty
+
+heapSize :: Ord a => Heap a -> Int
+heapSize HEmpty = 0
+heapSize (HNode _ size _ _) = size
+
+heapMin :: Ord a => Heap a -> a
+heapMin (HNode min _ _ _) = min
+
+addLast :: Ord a => Heap a -> a -> Heap a
+addLast HEmpty x = HNode x 1 HEmpty HEmpty
+addLast (HNode y size left right) x
+  | heapSize left <= heapSize right = HNode y (size + 1) (addLast left x) right
+  | otherwise                       = HNode y (size + 1) left (addLast right x)
+
+heapifyUp :: Ord a => Heap a -> Heap a
+heapifyUp HEmpty = HEmpty
+heapifyUp (HNode x size left right)
+  | heapSize left > heapSize right = let newLeft = heapifyUp left
+    in case heapifyUp left of
+      (HNode y size' left' right') -> if y < x
+        then HNode y size (HNode x size' left' right') right
+        else HNode x size newLeft right
+      _ -> HNode x size newLeft right
+  | otherwise = let newRight = heapifyUp right
+    in case heapifyUp right of
+      (HNode y size' left' right') -> if y < x
+        then HNode y size left (HNode x size' left' right')
+        else HNode x size left newRight
+      _ -> HNode x size left newRight
+
+heapInsert :: Ord a => Heap a -> a -> Heap a
+heapInsert heap x = heapifyUp $ addLast heap x
+
+removeLast :: Ord a => Heap a -> (a, Heap a)
+removeLast (HNode x _ HEmpty HEmpty) = (x, HEmpty)
+removeLast (HNode x size left right)
+  | heapSize left > heapSize right = let (lastVal, newLeft) = removeLast left in (lastVal, HNode x (size - 1) newLeft right)
+  | otherwise                      = let (lastVal, newRight) = removeLast right in (lastVal, HNode x (size - 1) left newRight)
+
+heapifyDown :: Ord a => Heap a -> Heap a
+heapifyDown (HNode x size left@(HNode y size' left' right') right@(HNode z size'' left'' right''))
+  | y < x && y < z = HNode y size (HNode x size' left' right') right
+  | z < x          = HNode z size left (HNode x size'' left'' right'')
+heapifyDown (HNode x size (HNode y size' left' right') HEmpty)
+  | y < x = HNode y size (HNode x size' left' right') HEmpty
+heapifyDown (HNode x size HEmpty (HNode y size' left' right'))
+  | y < x = HNode y size (HNode x size' left' right') HEmpty
+heapifyDown heap = heap
+
+heapPopMin :: Ord a => Heap a -> (a, Heap a)
+heapPopMin heap = let (lastVal, newTree) = removeLast heap
+  in case newTree of
+    (HNode x size left right) -> (x, heapifyDown (HNode lastVal size left right))
+    HEmpty -> (lastVal, HEmpty)
+
+heapIsEmpty :: Ord a => Heap a -> Bool
+heapIsEmpty HEmpty = True
+heapIsEmpty _ = False
+
 -- cities
 
 uniq :: Eq a => [a] -> [a]
@@ -77,6 +205,7 @@ adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == c
 
 -- pathDistance
 
+-- TODO: Optimize
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
 pathDistance roadMap path = sum <$> sequence distances
@@ -90,12 +219,16 @@ pathDistance roadMap path = sum <$> sequence distances
 -- rome
 
 rome :: RoadMap -> [City]
-rome roadMap = map fst (filter (\(c,d) -> d == maxDegree) degrees)
-  where
+rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
+  where 
+    adjList :: AdjList
+    adjList = toAdjList roadMap
+
     degrees :: [(City, Int)]
-    degrees = [(city, length (adjacent roadMap city)) | city <- cities roadMap]
+    degrees = [(city, length adj) | (city, adj) <- adjList]
+    
     maxDegree :: Int
-    maxDegree = maximum (map snd degrees)
+    maxDegree = maximum $ map snd degrees
 
 -- isStronglyConnected
 
@@ -113,7 +246,7 @@ reverseGraph :: RoadMap -> RoadMap
 reverseGraph roadMap = [reverseEdge edge | edge <- roadMap]
 
 sortedAdjacent :: RoadMap -> City -> ([(City,Distance)],RoadMap)
-sortedAdjacent [] _ = ([], []) 
+sortedAdjacent [] _ = ([], [])
 sortedAdjacent ((orig, dest, dist):subRoadMap) city
   | orig == city = ((dest, dist) : subAdjacents, finalRoadMap)
   | otherwise    = ([], (orig, dest, dist):subRoadMap)
@@ -134,7 +267,7 @@ toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCit
 
     adjs :: [[(City,Distance)]]
     adjs =  sortedAdjacents (Data.List.sort roadMap) mapCities
-    
+
     revAdjs :: [[(City,Distance)]]
     revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
 
@@ -148,46 +281,38 @@ adjacent' adjList city = unjust $ lookup city adjList
 getCityIndex :: AdjList -> City -> Int
 getCityIndex roadMap city = unjust $ Data.List.elemIndex city $ map fst roadMap
 
-dfs :: AdjList -> City -> [Bool]
-dfs adjList root = dfsVisit visitedList root
+dfs :: AdjList -> City -> Set City
+dfs adjList root = dfsVisit visitedSet root
   where
-    visitedList :: [Bool]
-    visitedList = [False | _ <- adjList]
+    visitedSet :: Set City
+    visitedSet = emptySet
 
-    setVisited :: AdjList -> City -> [Bool] -> [Bool]
-    setVisited [] _ _ = []
-    setVisited ((city,_):subAdjList) targetCity (visited:subVisitedList)
-      | city == targetCity = True : subVisitedList
-      | otherwise          = visited : setVisited subAdjList targetCity subVisitedList
-
-    getUnvisitedAdjs :: AdjList -> [(City,Distance)] -> [Bool] -> [City]
-    getUnvisitedAdjs _ [] _ = []
-    getUnvisitedAdjs ((city,_):subAdjList) ((adj,dist):adjacents) (visited:subVisitedList)
-      | city < adj  = getUnvisitedAdjs subAdjList ((adj,dist):adjacents) subVisitedList
-      | not visited = city : getUnvisitedAdjs subAdjList adjacents subVisitedList
-      | otherwise   = getUnvisitedAdjs subAdjList adjacents subVisitedList
-
-    dfsVisit :: [Bool] -> City -> [Bool]
-    dfsVisit visitedList root = foldl dfsVisit nextVisitedList unvisitedAdjs
+    dfsVisit :: Set City -> City -> Set City
+    dfsVisit visitedSet root = foldl dfsVisit nextVisitedSet unvisitedAdjs
       where
-        nextVisitedList :: [Bool]
-        nextVisitedList = setVisited adjList root visitedList
+        nextVisitedSet :: Set City
+        nextVisitedSet = insertSet visitedSet root
 
         adjs :: [(City,Distance)]
         adjs = adjacent' adjList root
 
         unvisitedAdjs :: [City]
-        unvisitedAdjs = getUnvisitedAdjs adjList adjs visitedList
+        unvisitedAdjs = [city | (city,_) <- adjs, not (containsSet visitedSet city)]
 
 
 isStronglyConnected :: RoadMap -> Bool
-isStronglyConnected roadMap = and $ dfs adjList root
+isStronglyConnected roadMap = and $ [containsSet res city | city <- cities roadMap]
   where
     adjList :: AdjList
     adjList = toAdjList roadMap
 
     root :: City
     root = fst $ head adjList
+
+    res :: Set City
+    res = dfs adjList root
+
+-- shortestPath
 
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath = undefined
