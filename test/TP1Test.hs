@@ -48,16 +48,19 @@ goodRoadMap = do
 -- prop_reverseInvolution xs = reverse (reverse xs) == xs
 
 prop_emptySetContainsNoElements :: Int -> Bool
-prop_emptySetContainsNoElements n = not (containsSet emptySet n)
+prop_emptySetContainsNoElements y = not (containsSet emptySet y)
 
-prop_setContainsInsertedElement :: Int -> Bool
-prop_setContainsInsertedElement n = containsSet (insertSet emptySet n) n
+prop_setContainsInsertedElement :: [Int] -> Int -> Bool
+prop_setContainsInsertedElement xs y = let set = foldl insertSet emptySet xs
+  in containsSet (insertSet set y) y
 
-prop_setUniqueInsertions :: Int -> Bool
-prop_setUniqueInsertions n = insertSet (insertSet emptySet n) n == insertSet emptySet n
+prop_setUniqueInsertions :: [Int] -> Int -> Bool
+prop_setUniqueInsertions xs n = let set = foldl insertSet emptySet xs
+  in insertSet (insertSet set n) n == insertSet set n
 
-prop_setInsertionCommutativity :: Int -> Int -> Bool
-prop_setInsertionCommutativity n1 n2 = setToList (insertSet (insertSet emptySet n1) n2) == setToList (insertSet (insertSet emptySet n2) n1)
+prop_setInsertionCommutativity :: [Int] -> Int -> Int -> Bool
+prop_setInsertionCommutativity xs y z = let set = foldl insertSet emptySet xs
+  in setToList (insertSet (insertSet set y) z) == setToList (insertSet (insertSet set z) y)
 
 prop_setIsBalanced :: [Int] -> Bool
 prop_setIsBalanced xs = abs (balanceFactor $ foldl insertSet emptySet xs) <= 1
