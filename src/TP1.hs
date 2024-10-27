@@ -49,15 +49,8 @@ distance roadMap city1 city2 = if null match then Nothing else Just (head match)
   where
     match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
-merge :: Ord a => [a] -> [a] -> [a]
-merge xs [] = xs
-merge [] ys = ys
-merge (x:xs) (y:ys)
-  | x <= y    = x : merge xs (y:ys)
-  | otherwise = y : merge (x:xs) ys
-
 adjacent :: RoadMap -> City -> [(City,Distance)]
-adjacent roadMap city = merge (Data.List.sort [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city]) (Data.List.sort [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city])
+adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == city] ++ [(orig, dist) | (orig, dest, dist) <- roadMap, dest == city]
 
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
@@ -77,8 +70,47 @@ rome roadMap = map fst (filter (\(c,d) -> d == maxDegree) degrees)
     maxDegree :: Int
     maxDegree = maximum (map snd degrees)
 
+-- isStronglyConnected
+
+merge :: Ord a => [a] -> [a] -> [a]
+merge xs [] = xs
+merge [] ys = ys
+merge (x:xs) (y:ys)
+  | x <= y    = x : merge xs (y:ys)
+  | otherwise = y : merge (x:xs) ys
+
+reverseEdge :: (City,City,Distance) -> (City,City,Distance)
+reverseEdge (orig, dest, dist) = (dest, orig, dist)
+
+reverseGraph :: RoadMap -> RoadMap
+reverseGraph roadMap = [reverseEdge edge | edge <- roadMap]
+
+sortedAdjacent :: RoadMap -> City -> ([(City,Distance)],RoadMap)
+sortedAdjacent [] _ = ([], []) 
+sortedAdjacent ((orig, dest, dist):subRoadMap) city
+  | orig == city = ((dest, dist) : subAdjacents, finalRoadMap)
+  | otherwise    = ([], (orig, dest, dist):subRoadMap)
+    where
+      (subAdjacents, finalRoadMap) = sortedAdjacent subRoadMap city
+
+sortedAdjacents :: RoadMap -> [City] -> [[(City,Distance)]]
+sortedAdjacents _ [] = []
+sortedAdjacents roadMap (city:cities) = adjacent : sortedAdjacents subRoadMap cities
+  where
+    (adjacent, subRoadMap) = sortedAdjacent roadMap city
+
 toAdjList :: RoadMap -> AdjList
-toAdjList roadMap = [(city, adjacent roadMap city) | city <- cities roadMap]
+toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCities adjs revAdjs
+  where
+    mapCities :: [City]
+    mapCities = cities roadMap
+
+    adjs :: [[(City,Distance)]]
+    adjs =  sortedAdjacents (Data.List.sort roadMap) mapCities
+    
+    revAdjs :: [[(City,Distance)]]
+    revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
+
 
 adjacent' :: AdjList -> City -> [(City,Distance)]
 adjacent' adjList city = case lookup city adjList of
