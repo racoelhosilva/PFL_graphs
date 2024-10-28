@@ -8,37 +8,61 @@ import Data.Maybe
 import Data.List
 
 import TP1
+import Data.Char
 
 
 -- Generators
 
-goodCity :: Gen City
-goodCity = elements [[c] | c <- ['A'..'I']]
+newtype GoodCity = GoodCity City deriving (Show, Eq)
+newtype GoodEdge = GoodEdge (City, City, Distance) deriving (Show, Eq)
+newtype GoodRoadMap = GoodRoadMap RoadMap deriving (Show, Eq)
 
-goodEdge :: Gen (City, City, Distance)
-goodEdge = do
-  orig <- goodCity;
-  dest <- goodCity `suchThat` (/= orig);
-  dist <- arbitrary `suchThat` (> 0);
-  return (orig, dest, dist);
+instance Arbitrary GoodCity where
+  arbitrary = do
+    char <- choose ('A', 'I')
+    return $ GoodCity [char]
+
+  shrink (GoodCity [char]) = [GoodCity [newChar] | newChar <- ['A'..chr $ ord char - 1]]
+  
+instance Arbitrary GoodEdge where
+  arbitrary = do
+    GoodCity orig <- arbitrary
+    GoodCity dest <- arbitrary `suchThat` (/= GoodCity orig)
+    Positive dist <- arbitrary
+    return $ GoodEdge (orig, dest, dist)
+  
+  shrink (GoodEdge (orig, dest, dist)) =
+    [GoodEdge (newOrig, dest, dist) | GoodCity newOrig <- shrink (GoodCity orig), newOrig /= dest] ++
+    [GoodEdge (orig, newDest, dist) | GoodCity newDest <- shrink (GoodCity dest), newDest /= orig] ++
+    [GoodEdge (orig, dest, newDist) | newDist <- shrink dist]
+
+unwrapGoodEdge :: GoodEdge -> (City, City, Distance)
+unwrapGoodEdge (GoodEdge edge) = edge
+
+sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool
+sameEdge (orig, dest, _) (orig', dest', _) = (orig, dest) == (orig', dest') || (orig, dest) == (dest', orig')
+
+removeDuplicateEdges :: RoadMap -> RoadMap
+removeDuplicateEdges [] = []
+removeDuplicateEdges (edge:edges)
+  | any (sameEdge edge) edges = removeDuplicateEdges edges
+  | otherwise                 = edge : removeDuplicateEdges edges
+
+instance Arbitrary GoodRoadMap where
+  arbitrary = do
+    rawMap <- listOf (arbitrary :: Gen GoodEdge)
+    return $ GoodRoadMap $ removeDuplicateEdges $ map unwrapGoodEdge rawMap where
+
+  shrink (GoodRoadMap roadMap) =
+    [GoodRoadMap $ removeDuplicateEdges $ map unwrapGoodEdge edges | edges <- shrink $ map GoodEdge roadMap]
 
 goodPath :: RoadMap -> Gen Path
-goodPath roadMap = shuffle (cities roadMap) >>= sublistOf
+goodPath roadMap = do
+  mapCities <- shuffle (cities roadMap)
+  sublistOf mapCities
 
-
-goodRoadMap :: Gen RoadMap
-goodRoadMap = do
-  rawMap <- listOf goodEdge;
-  return $ removeDuplicates rawMap where
-    sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool
-    sameEdge (orig, dest, _) (orig', dest', _) = (orig, dest) == (orig', dest') || (orig, dest) == (dest', orig')
-
-    removeDuplicates :: RoadMap -> RoadMap
-    removeDuplicates [] = []
-    removeDuplicates (edge:edges)
-      | any (sameEdge edge) edges = removeDuplicates edges
-      | otherwise                 = edge : removeDuplicates edges
-
+forAllGoodPaths :: Testable prop => RoadMap -> (Path -> prop) -> Property
+forAllGoodPaths roadMap = forAllShrink (goodPath roadMap) shrink
 
 -- Property-based tests
 
@@ -123,16 +147,14 @@ prop_heapIsOrdered xs = isOrdered $ foldl heapInsert emptyHeap xs
 prop_heapInsertNotEmpty :: [Int] -> Int -> Bool
 prop_heapInsertNotEmpty xs x = not $ heapIsEmpty $ heapInsert (foldl heapInsert emptyHeap xs) x
 
-prop_heapMinIsExtracted :: Property
-prop_heapMinIsExtracted =
-  forAll (listOf1 (arbitrary :: Gen Int)) $ \xs -> let
-    heap = foldl heapInsert emptyHeap xs
-    min = heapMin heap
-    in min == fst (heapPopMin heap) && min == minimum xs
+prop_heapMinIsExtracted :: NonEmptyList Int -> Bool
+prop_heapMinIsExtracted (NonEmpty xs) = let
+  heap = foldl heapInsert emptyHeap xs
+  min = heapMin heap
+  in min == fst (heapPopMin heap) && min == minimum xs
 
-prop_heapBalancedAfterExtraction :: Property
-prop_heapBalancedAfterExtraction =
-  forAll (listOf (arbitrary :: Gen Int)) $ \xs ->
+prop_heapBalancedAfterExtraction :: NonEmptyList Int -> Property
+prop_heapBalancedAfterExtraction (NonEmpty xs) =
   forAll (choose (0, length xs)) $ \extractions ->
     isBalanced $ iterate (snd . heapPopMin) (foldl heapInsert emptyHeap xs) !! extractions
       where
@@ -141,49 +163,36 @@ prop_heapBalancedAfterExtraction =
         isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
           && isBalanced left && isBalanced right
 
-prop_citiesWithoutDuplicates :: Property
-prop_citiesWithoutDuplicates = forAll goodRoadMap $ \roadMap -> allUnique $ cities roadMap where
+prop_citiesWithoutDuplicates :: GoodRoadMap -> Bool
+prop_citiesWithoutDuplicates (GoodRoadMap roadMap) = allUnique $ cities roadMap where
   allUnique :: Eq a => [a] -> Bool
   allUnique [] = True
   allUnique (x:xs) = x `notElem` xs && allUnique xs
 
-prop_areAdjacentCommutativity :: Property
-prop_areAdjacentCommutativity =
-  forAll goodRoadMap $ \roadMap ->
-  forAll goodCity $ \city1 ->
-  forAll goodCity $ \city2 ->
-    areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
+prop_areAdjacentCommutativity :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
+prop_areAdjacentCommutativity (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
+  areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
 
-prop_distanceCommutativity :: Property
-prop_distanceCommutativity =
-  forAll goodRoadMap $ \roadMap ->
-  forAll goodCity $ \city1 ->
-  forAll goodCity $ \city2 ->
-    distance roadMap city1 city2 == distance roadMap city2 city1
+prop_distanceCommutativity :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
+prop_distanceCommutativity (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
+  distance roadMap city1 city2 == distance roadMap city2 city1
 
-prop_distanceAdjacency :: Property
-prop_distanceAdjacency =
-  forAll goodRoadMap $ \roadMap ->
-  forAll goodCity $ \city1 ->
-  forAll goodCity $ \city2 ->
-    let adjacent = areAdjacent roadMap city1 city2
+prop_distanceAdjacency :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
+prop_distanceAdjacency (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
+  let adjacent = areAdjacent roadMap city1 city2
     in case distance roadMap city1 city2 of
       Nothing -> not adjacent
       Just _  -> adjacent
 
-prop_adjacentDistance :: Property
-prop_adjacentDistance =
-  forAll goodRoadMap $ \roadMap ->
-  forAll goodCity $ \city1 ->
-    let adjacents = adjacent roadMap city1
+prop_adjacentDistance :: GoodRoadMap -> GoodCity -> Bool
+prop_adjacentDistance (GoodRoadMap roadMap) (GoodCity city1) =
+  let adjacents = adjacent roadMap city1
     in all (\(city2, dist) -> distance roadMap city1 city2 == Just dist) adjacents
 
-prop_pathDistanceDistributivity :: Property
-prop_pathDistanceDistributivity =
-  forAll goodRoadMap $ \roadMap ->
-  forAll (goodPath roadMap) $ \path1 ->
-  forAll goodCity $ \middleCity ->
-  forAll (goodPath roadMap) $ \path2 ->
+prop_pathDistanceDistributivity :: GoodRoadMap -> GoodCity -> Property
+prop_pathDistanceDistributivity (GoodRoadMap roadMap) (GoodCity middleCity) =
+  forAllGoodPaths roadMap $ \path1 ->
+  forAllGoodPaths roadMap $ \path2 ->
     pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
 
 
