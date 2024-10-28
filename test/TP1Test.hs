@@ -9,6 +9,8 @@ import Data.List
 
 import TP1
 import Data.Char
+import Data.Coerce (coerce)
+import Data.Functor
 
 
 -- Generators
@@ -16,6 +18,7 @@ import Data.Char
 newtype GoodCity = GoodCity City deriving (Show, Eq)
 newtype GoodEdge = GoodEdge (City, City, Distance) deriving (Show, Eq)
 newtype GoodRoadMap = GoodRoadMap RoadMap deriving (Show, Eq)
+newtype GoodPath = GoodPath Path deriving (Show, Eq)
 
 instance Arbitrary GoodCity where
   arbitrary = do
@@ -23,21 +26,18 @@ instance Arbitrary GoodCity where
     return $ GoodCity [char]
 
   shrink (GoodCity [char]) = [GoodCity [newChar] | newChar <- ['A'..chr $ ord char - 1]]
-  
+
 instance Arbitrary GoodEdge where
   arbitrary = do
     GoodCity orig <- arbitrary
     GoodCity dest <- arbitrary `suchThat` (/= GoodCity orig)
     Positive dist <- arbitrary
     return $ GoodEdge (orig, dest, dist)
-  
+
   shrink (GoodEdge (orig, dest, dist)) =
     [GoodEdge (newOrig, dest, dist) | GoodCity newOrig <- shrink (GoodCity orig), newOrig /= dest] ++
     [GoodEdge (orig, newDest, dist) | GoodCity newDest <- shrink (GoodCity dest), newDest /= orig] ++
-    [GoodEdge (orig, dest, newDist) | newDist <- shrink dist]
-
-unwrapGoodEdge :: GoodEdge -> (City, City, Distance)
-unwrapGoodEdge (GoodEdge edge) = edge
+    [GoodEdge (orig, dest, newDist) | Positive newDist <- shrink (Positive dist)]
 
 sameEdge :: (City, City, Distance) -> (City, City, Distance) -> Bool
 sameEdge (orig, dest, _) (orig', dest', _) = (orig, dest) == (orig', dest') || (orig, dest) == (dest', orig')
@@ -51,18 +51,40 @@ removeDuplicateEdges (edge:edges)
 instance Arbitrary GoodRoadMap where
   arbitrary = do
     rawMap <- listOf (arbitrary :: Gen GoodEdge)
-    return $ GoodRoadMap $ removeDuplicateEdges $ map unwrapGoodEdge rawMap where
+    return $ GoodRoadMap $ removeDuplicateEdges $ map coerce rawMap
 
-  shrink (GoodRoadMap roadMap) =
-    [GoodRoadMap $ removeDuplicateEdges $ map unwrapGoodEdge edges | edges <- shrink $ map GoodEdge roadMap]
+  shrink (GoodRoadMap roadMap) = [GoodRoadMap $ removeDuplicateEdges $ map coerce edges | edges <- shrink $ map GoodEdge roadMap]
 
-goodPath :: RoadMap -> Gen Path
-goodPath roadMap = do
-  mapCities <- shuffle (cities roadMap)
-  sublistOf mapCities
+instance Arbitrary GoodPath where
+  arbitrary = listOf1 (arbitrary :: Gen GoodCity) <&> (GoodPath . map coerce)
 
-forAllGoodPaths :: Testable prop => RoadMap -> (Path -> prop) -> Property
-forAllGoodPaths roadMap = forAllShrink (goodPath roadMap) shrink
+  shrink (GoodPath path) = [GoodPath $ map coerce newPath | newPath <- shrink $ map GoodCity path, not $ null newPath]
+
+
+forAllCities :: Testable prop => GoodRoadMap -> (GoodCity -> prop) -> Property
+forAllCities (GoodRoadMap roadMap) = forAllShrink mapCity shrink
+  where
+    mapCity :: Gen GoodCity
+    mapCity = do
+      city <- elements $ cities roadMap
+      return $ GoodCity city
+
+forAllEdges :: Testable prop => GoodRoadMap -> (GoodEdge -> prop) -> Property
+forAllEdges (GoodRoadMap roadMap) = forAllShrink mapEdge shrink
+  where
+    mapEdge :: Gen GoodEdge
+    mapEdge = elements roadMap <&> GoodEdge
+
+forAllPaths :: Testable prop => GoodRoadMap -> (GoodPath -> prop) -> Property
+forAllPaths (GoodRoadMap []) = forAll (return $ GoodPath [])
+forAllPaths (GoodRoadMap roadMap) = forAllShrink mapPath shrink
+  where
+    mapPath :: Gen GoodPath
+    mapPath = do
+      shuffledCities <- shuffle $ cities roadMap
+      newCitySublist <- sublistOf $ tail shuffledCities
+      return $ GoodPath $ head shuffledCities : newCitySublist
+
 
 -- Property-based tests
 
@@ -163,37 +185,46 @@ prop_heapBalancedAfterExtraction (NonEmpty xs) =
         isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
           && isBalanced left && isBalanced right
 
+
 prop_citiesWithoutDuplicates :: GoodRoadMap -> Bool
 prop_citiesWithoutDuplicates (GoodRoadMap roadMap) = allUnique $ cities roadMap where
   allUnique :: Eq a => [a] -> Bool
   allUnique [] = True
   allUnique (x:xs) = x `notElem` xs && allUnique xs
 
-prop_areAdjacentCommutativity :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
-prop_areAdjacentCommutativity (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
-  areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
+prop_areAdjacentCommutativity :: GoodRoadMap -> Property
+prop_areAdjacentCommutativity goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+  forAllCities goodRoadMap $ \(GoodCity city2) ->
+    areAdjacent roadMap city1 city2 == areAdjacent roadMap city2 city1
 
-prop_distanceCommutativity :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
-prop_distanceCommutativity (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
-  distance roadMap city1 city2 == distance roadMap city2 city1
+prop_distanceCommutativity :: GoodRoadMap -> Property
+prop_distanceCommutativity goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+  forAllCities goodRoadMap $ \(GoodCity city2) ->
+    distance roadMap city1 city2 == distance roadMap city2 city1
 
-prop_distanceAdjacency :: GoodRoadMap -> GoodCity -> GoodCity -> Bool
-prop_distanceAdjacency (GoodRoadMap roadMap) (GoodCity city1) (GoodCity city2) =
-  let adjacent = areAdjacent roadMap city1 city2
+prop_distanceAdjacency :: GoodRoadMap -> Property
+prop_distanceAdjacency goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+  forAllCities goodRoadMap $ \(GoodCity city2) ->
+    let adjacent = areAdjacent roadMap city1 city2
     in case distance roadMap city1 city2 of
       Nothing -> not adjacent
       Just _  -> adjacent
 
-prop_adjacentDistance :: GoodRoadMap -> GoodCity -> Bool
-prop_adjacentDistance (GoodRoadMap roadMap) (GoodCity city1) =
-  let adjacents = adjacent roadMap city1
+prop_adjacentDistance :: GoodRoadMap -> Property
+prop_adjacentDistance goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+    let adjacents = adjacent roadMap city1
     in all (\(city2, dist) -> distance roadMap city1 city2 == Just dist) adjacents
 
-prop_pathDistanceDistributivity :: GoodRoadMap -> GoodCity -> Property
-prop_pathDistanceDistributivity (GoodRoadMap roadMap) (GoodCity middleCity) =
-  forAllGoodPaths roadMap $ \path1 ->
-  forAllGoodPaths roadMap $ \path2 ->
-    pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
+prop_pathDistanceDistributivity :: GoodRoadMap -> Property
+prop_pathDistanceDistributivity goodRoadMap@(GoodRoadMap roadMap) =
+  forAllPaths goodRoadMap $ \(GoodPath path1) ->
+  forAllCities goodRoadMap $ \ (GoodCity middleCity) ->
+  forAllPaths goodRoadMap $ \(GoodPath path2) ->
+    pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (product <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
 
 
 -- Main
@@ -326,7 +357,7 @@ main = hspec $ do
       pathDistance gTest3 ["0", "1", "2"] `shouldBe` Nothing
 
     it "Nothing is returned for small paths" $ do
-      pathDistance gTest1 ["7"] `shouldBe` Just 0  -- TODO: see this
+      pathDistance gTest1 ["7"] `shouldBe` Just 0
       pathDistance gTest1 [] `shouldBe` Nothing
 
     prop "Distance of concatenation equals sum of distances" $ do
