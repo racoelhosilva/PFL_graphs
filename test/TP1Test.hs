@@ -224,7 +224,7 @@ prop_pathDistanceDistributivity goodRoadMap@(GoodRoadMap roadMap) =
   forAllPaths goodRoadMap $ \(GoodPath path1) ->
   forAllCities goodRoadMap $ \ (GoodCity middleCity) ->
   forAllPaths goodRoadMap $ \(GoodPath path2) ->
-    pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (product <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
+    pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
 
 
 -- Main
