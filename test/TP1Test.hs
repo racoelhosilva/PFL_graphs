@@ -4,6 +4,7 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
+import Data.Maybe
 import Data.List
 
 import TP1
@@ -75,6 +76,31 @@ prop_setIsOrdered xs = isOrdered res
 
     res :: [Int]
     res = setToList $ foldl insertSet emptySet xs
+
+prop_entriesWithSameKeyAreEqual :: Int -> Int -> Int -> Bool
+prop_entriesWithSameKeyAreEqual k v1 v2 = MEntry k v1 == MEntry k v2
+
+prop_emptyMapContainsNoElements :: Int -> Bool
+prop_emptyMapContainsNoElements y = isNothing (lookupMap emptyMap y)
+
+prop_mapContainsInsertedKVPair :: [(Int, Int)] -> Int -> Int -> Bool
+prop_mapContainsInsertedKVPair kvs k v = let map = mapFromList kvs
+  in unjust (lookupMap (insertMap map k v) k) == v
+
+prop_repeatedMapInsertionsUpdate :: [(Int, Int)] -> Int -> Int -> Int -> Bool
+prop_repeatedMapInsertionsUpdate kvs k v1 v2 = let map = mapFromList kvs
+  in unjust (lookupMap (insertMap (insertMap map k v1) k v2) k) == v2
+
+prop_mapIsOrdered :: [(Int,Int)] -> Bool
+prop_mapIsOrdered kvs = isOrdered res
+    where
+    isOrdered :: [(Int, Int)] -> Bool
+    isOrdered [] = True
+    isOrdered [_] = True
+    isOrdered (x:y:xs) = fst x < fst y && isOrdered (y:xs)
+
+    res :: [(Int, Int)]
+    res = mapToList $ mapFromList kvs
 
 prop_heapIsBalanced :: [Int] -> Bool
 prop_heapIsBalanced xs = isBalanced $ foldl heapInsert emptyHeap xs
@@ -193,6 +219,22 @@ main = hspec $ do
     prop "Set is ordered"
       prop_setIsOrdered
 
+  describe "Map" $ do
+    prop "Entries with the same key are equal"
+      prop_entriesWithSameKeyAreEqual
+
+    prop "Empty Map contains no elements"
+      prop_emptyMapContainsNoElements
+
+    prop "Map contains inserted Key Value pair"
+      prop_mapContainsInsertedKVPair
+
+    prop "Repeated insertions result in updates"
+      prop_repeatedMapInsertionsUpdate
+
+    prop "Map is ordered"
+      prop_mapIsOrdered
+
   describe "Heap" $ do
     describe "insert" $ do
       prop "Heap is balanced"
@@ -206,7 +248,7 @@ main = hspec $ do
 
       prop "Heap min is extracted"
         prop_heapMinIsExtracted
-      
+
       prop "Heap balanced after extraction"
         prop_heapBalancedAfterExtraction
 

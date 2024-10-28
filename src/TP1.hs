@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 module TP1 where
 
 import qualified Data.List
@@ -56,11 +57,11 @@ balanceFactor SEmpty = 0
 balanceFactor (SNode _ l r _) = height l - height r
 
 rotateRight :: Set a -> Set a
-rotateRight (SNode y (SNode x l lx h2) r h1) = updateHeight $ SNode x l (updateHeight (SNode y lx r h2)) h1
+rotateRight (SNode y (SNode x l lx h2) r h1) = updateHeight $ SNode x l (updateHeight (SNode y lx r undefined)) undefined
 rotateRight s = s
 
 rotateLeft :: Set a -> Set a
-rotateLeft (SNode x l (SNode y rx r h2) h1) = updateHeight $ SNode y (updateHeight (SNode x l rx h2)) r h1
+rotateLeft (SNode x l (SNode y rx r h2) h1) = updateHeight $ SNode y (updateHeight (SNode x l rx undefined)) r undefined
 rotateLeft s = s
 
 balance :: Set a -> Set a
@@ -78,7 +79,7 @@ insertSet SEmpty newVal = SNode newVal SEmpty SEmpty 1
 insertSet (SNode val l r h) newVal
   | val > newVal  = balance (SNode val (insertSet l newVal) r h)
   | val < newVal  = balance (SNode val l (insertSet r newVal) h)
-  | otherwise     = SNode val l r h
+  | otherwise     = SNode newVal l r h
 
 containsSet :: (Ord a) => Set a -> a -> Bool
 containsSet SEmpty _ = False
@@ -97,6 +98,41 @@ searchSet (SNode val l r h) target
 setToList :: Set a -> [a]
 setToList SEmpty = []
 setToList (SNode v l r _) = setToList l ++ [v] ++ setToList r
+
+-- Map
+
+data MEntry k v = MEntry k v
+  deriving (Show)
+
+instance Eq k => Eq (MEntry k v) where
+  (==) :: Eq k => MEntry k v -> MEntry k v -> Bool
+  (MEntry k1 _) == (MEntry k2 _) = k1 == k2 
+
+instance Ord k => Ord (MEntry k v) where
+  compare :: Ord k => MEntry k v -> MEntry k v -> Ordering
+  (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
+
+newtype Ord k => Map k v = Map (Set (MEntry k v))
+
+emptyMap :: Ord k => Map k v
+emptyMap = Map emptySet
+
+insertMap :: Ord k => Map k v -> k -> v -> Map k v
+insertMap (Map s) key value = Map (insertSet s (MEntry key value))
+
+lookupMap :: Ord k => Map k v -> k -> Maybe v
+lookupMap (Map s) key =
+    case searchSet s (MEntry key undefined) of
+        SEmpty                    -> Nothing
+        SNode (MEntry _ v) _ _ _  -> Just v
+
+mapFromList :: Ord k => [(k,v)] -> Map k v
+mapFromList [] = emptyMap
+mapFromList ((key,val):subList) = insertMap (mapFromList subList) key val
+
+mapToList :: Ord k => Map k v -> [(k,v)]
+mapToList (Map SEmpty) = []
+mapToList (Map (SNode (MEntry k v) l r _)) = mapToList (Map l) ++ [(k,v)] ++ mapToList (Map r)
 
 -- Binary Heap
 
