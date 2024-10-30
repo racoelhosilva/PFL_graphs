@@ -53,6 +53,7 @@ instance Arbitrary GoodRoadMap where
     rawMap <- listOf (arbitrary :: Gen GoodEdge)
     return $ GoodRoadMap $ removeDuplicateEdges $ map coerce rawMap
 
+  shrink (GoodRoadMap []) = [GoodRoadMap []]
   shrink (GoodRoadMap roadMap) = [GoodRoadMap $ removeDuplicateEdges $ map coerce edges | edges <- shrink $ map GoodEdge roadMap]
 
 instance Arbitrary GoodPath where
@@ -226,6 +227,17 @@ prop_pathDistanceDistributivity goodRoadMap@(GoodRoadMap roadMap) =
   forAllPaths goodRoadMap $ \(GoodPath path2) ->
     pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
 
+prop_shortestPathCorrectEnds :: GoodRoadMap -> Property
+prop_shortestPathCorrectEnds goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+  forAllCities goodRoadMap $ \(GoodCity city2) ->
+    all (\path -> head path == city1 && last path == city2) $ shortestPath roadMap city1 city2
+
+prop_shortestPathSubstructure :: GoodRoadMap -> Property
+prop_shortestPathSubstructure goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city1) ->
+  forAllCities goodRoadMap $ \(GoodCity city2) ->
+    all (\path -> length path == 2 || tail path `elem` shortestPath roadMap (path !! 1) city2) $ shortestPath roadMap city1 city2
 
 -- Main
 
@@ -379,3 +391,21 @@ main = hspec $ do
 
     it "Detects unconnected maps" $ do
       isStronglyConnected gTest3 `shouldBe` False
+
+  describe "shortestPath" $ do
+    it "Calculates right shortest path" $ do
+      shortestPath gTest1 "7" "2" `shouldBe` [["7", "6", "5", "2"]]
+      shortestPath gTest2 "1" "2" `shouldBe` [["1", "0", "2"]]
+      shortestPath gTest3 "0" "1" `shouldBe` [["0", "1"]]
+
+    it "Calculates multiple shortest paths" $ do
+      shortestPath gTest1 "7" "8" `shouldBe` [["7", "8"], ["7", "6", "8"]]
+
+    it "Checks if no path exists" $ do
+      shortestPath gTest3 "0" "2" `shouldBe` []
+
+    -- prop "Shortest paths start and end on the right cities"
+    --   prop_shortestPathCorrectEnds
+
+    -- prop "Shortest paths respect optimal substructure"
+    --   prop_shortestPathSubstructure
