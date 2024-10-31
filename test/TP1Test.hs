@@ -244,6 +244,16 @@ prop_shortestPathSubstructure goodRoadMap@(GoodRoadMap roadMap) =
   forAllCities goodRoadMap $ \(GoodCity city2) ->
     conjoin $ map (\path -> length path > 2 ==> tail path `elem` shortestPath roadMap (path !! 1) city2) $ shortestPath roadMap city1 city2
 
+prop_travelSalesSameEnds :: GoodRoadMap -> Property
+prop_travelSalesSameEnds (GoodRoadMap roadMap) = let circuit = travelSales roadMap
+  in not (null circuit) ==> head circuit == last circuit 
+
+prop_travelSalesPassesEachCityOnce :: GoodRoadMap -> Property
+prop_travelSalesPassesEachCityOnce (GoodRoadMap roadMap) = let
+  circuit = travelSales roadMap
+  mapCities = cities roadMap
+  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUniq (nub circuit) == sortUniq mapCities
+
 -- Auxiliary Functions 
 
 rotate :: [a] -> Int -> [a]
@@ -433,5 +443,11 @@ main = hspec $ do
 
     it "Checks if no hamiltonian circuit exists" $ do
       travelSales gTest3 `shouldBe` []
+
+    prop "Circuit has the same ends" $ do
+      prop_travelSalesSameEnds
+
+    prop "Circuit passes through each city exactly once" $ do
+      prop_travelSalesPassesEachCityOnce
 
     

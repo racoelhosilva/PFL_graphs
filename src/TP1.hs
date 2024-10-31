@@ -485,6 +485,7 @@ heldKarp adjMatrix = dp Data.Array.! (start, fullBitmask (numCities - 1))
             [addCity (dp Data.Array.! (other, clearBit bitmask other)) city | other <- bitmaskToList bitmask]
 
 travelSales :: RoadMap -> Path
+travelSales [] = []
 travelSales roadMap = case heldKarp adjMatrix of
   (Just _, path) -> map getCity path
   (Nothing, _)   -> []
