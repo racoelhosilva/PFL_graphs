@@ -244,6 +244,17 @@ prop_shortestPathSubstructure goodRoadMap@(GoodRoadMap roadMap) =
   forAllCities goodRoadMap $ \(GoodCity city2) ->
     conjoin $ map (\path -> length path > 2 ==> tail path `elem` shortestPath roadMap (path !! 1) city2) $ shortestPath roadMap city1 city2
 
+-- Auxiliary Functions 
+
+rotate :: [a] -> Int -> [a]
+rotate xs n = let (xs1, xs2) = splitAt n (reverse xs)
+  in reverse xs1 ++ reverse xs2
+
+isRotationOf :: Eq a => [a] -> [a] -> Bool
+isRotationOf (x:xs) ys = case elemIndex x ys of
+  Just n  -> rotate (x:xs) n == ys
+  Nothing -> False
+
 -- Main
 
 main :: IO ()
@@ -414,3 +425,13 @@ main = hspec $ do
 
     prop "Shortest paths respect optimal substructure"
       prop_shortestPathSubstructure
+
+  describe "travelSales" $ do
+    it "Determines correct circuit" $ do
+      travelSales gTest1 `shouldSatisfy` isRotationOf ["0", "1", "2", "3", "4", "5", "6", "8", "7", "0"]
+      travelSales gTest2 `shouldSatisfy` isRotationOf ["0", "1", "3", "2", "0"]
+
+    it "Checks if no hamiltonian circuit exists" $ do
+      travelSales gTest3 `shouldBe` []
+
+    
