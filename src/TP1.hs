@@ -1,8 +1,6 @@
-{-# LANGUAGE InstanceSigs #-}
-
 module TP1 where
 
--- import qualified Data.Array
+import qualified Data.Array
 import qualified Data.Bits
 import qualified Data.List
 
@@ -22,24 +20,41 @@ type AdjList = [(City, [(City, Distance)])]
 
 type AdjMap = Map City [(City, Distance)]
 
+type AdjMatrix = Data.Array.Array (Int,Int) (Maybe Distance)
+
 -- Bitmask
 
-newtype Bitmask = Bitmask Integer
+type Bitmask = Int
 
-newBitmask :: Bitmask
-newBitmask = Bitmask 0
+emptyBitmask :: Bitmask
+emptyBitmask = 0
+
+fullBitmask :: Int -> Bitmask
+fullBitmask n
+  | n >= 0 && n < 30 = 1 `Data.Bits.shiftL` n - 1
+  | n == 30          = minBound :: Int
+  | otherwise        = error "Bitmask representation size out of bounds"
 
 setBit :: Bitmask -> Int -> Bitmask
-setBit (Bitmask bits) pos = Bitmask (Data.Bits.setBit bits pos)
+setBit = Data.Bits.setBit
 
 clearBit :: Bitmask -> Int -> Bitmask
-clearBit (Bitmask bits) pos = Bitmask (Data.Bits.clearBit bits pos)
+clearBit = Data.Bits.clearBit
 
 toggleBit :: Bitmask -> Int -> Bitmask
-toggleBit (Bitmask bits) pos = Bitmask (Data.Bits.complementBit bits pos)
+toggleBit = Data.Bits.complementBit
 
 isBitSet :: Bitmask -> Int -> Bool
-isBitSet (Bitmask bits) = Data.Bits.testBit bits
+isBitSet = Data.Bits.testBit
+
+bitmaskToList :: Bitmask -> [Int]
+bitmaskToList bitmask = toListAcc bitmask 0
+  where
+    toListAcc :: Bitmask -> Int -> [Int]
+    toListAcc 0 _ = []
+    toListAcc bitmask pos
+      | odd bitmask = pos : toListAcc (bitmask `div` 2) (pos + 1)
+      | otherwise   = toListAcc (bitmask `div` 2) (pos + 1)
 
 -- Set implementation based on an AVL Tree
 
@@ -101,6 +116,10 @@ searchSet (SNode val l r h) target
   | val < target = searchSet r target
   | otherwise = SNode val l r h
 
+sizeSet :: Set a -> Int
+sizeSet SEmpty = 0
+sizeSet (SNode _ l r _) = 1 + sizeSet l + sizeSet r
+
 setToList :: Set a -> [a]
 setToList SEmpty = []
 setToList (SNode v l r _) = setToList l ++ [v] ++ setToList r
@@ -111,11 +130,9 @@ data MEntry k v = MEntry k v
   deriving (Show)
 
 instance (Eq k) => Eq (MEntry k v) where
-  (==) :: (Eq k) => MEntry k v -> MEntry k v -> Bool
   (MEntry k1 _) == (MEntry k2 _) = k1 == k2
 
 instance (Ord k) => Ord (MEntry k v) where
-  compare :: (Ord k) => MEntry k v -> MEntry k v -> Ordering
   (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
 
 newtype (Ord k) => Map k v = Map (Set (MEntry k v))
@@ -132,6 +149,9 @@ lookupMap (Map s) key =
   case searchSet s (MEntry key undefined) of
     SEmpty -> Nothing
     SNode (MEntry _ v) _ _ _ -> Just v
+
+sizeMap :: Ord k => Map k v -> Int
+sizeMap (Map s) = sizeSet s
 
 mapFromList :: (Ord k) => [(k, v)] -> Map k v
 mapFromList [] = emptyMap
@@ -254,6 +274,13 @@ adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == c
 
 -- pathDistance
 
+merge :: (Ord a) => [a] -> [a] -> [a]
+merge xs [] = xs
+merge [] ys = ys
+merge (x : xs) (y : ys)
+  | x <= y = x : merge xs (y : ys)
+  | otherwise = y : merge (x : xs) ys
+
 toAdjList :: RoadMap -> AdjList
 toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCities adjs revAdjs
   where
@@ -265,13 +292,6 @@ toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCit
 
     revAdjs :: [[(City, Distance)]]
     revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
-
-merge :: (Ord a) => [a] -> [a] -> [a]
-merge xs [] = xs
-merge [] ys = ys
-merge (x : xs) (y : ys)
-  | x <= y = x : merge xs (y : ys)
-  | otherwise = y : merge (x : xs) ys
 
 reverseEdge :: (City, City, Distance) -> (City, City, Distance)
 reverseEdge (orig, dest, dist) = (dest, orig, dist)
@@ -377,7 +397,7 @@ dijkstra :: AdjMap -> Map City Predecessors -> Heap DijkstraState -> (Map City P
 dijkstra adjMap map heap
   | heapIsEmpty heap = (map, heap)
   | otherwise        = dijkstra adjMap newMap newHeap
-       
+
   where
     restHeap :: Heap DijkstraState
     ((newDist, city, pred), restHeap) = heapPopMin heap
@@ -399,7 +419,7 @@ dijkstra adjMap map heap
 
 reconstruct :: Map City Predecessors -> City -> City -> [Path]
 reconstruct predMap orig city
-  | city == orig = [[orig]] 
+  | city == orig = [[orig]]
   | otherwise    = case lookupMap predMap city of
     Just (_,preds) -> map (city :) $ concat [reconstruct predMap orig pred | pred <- preds]
     Nothing        -> []
@@ -414,8 +434,72 @@ shortestPath roadMap orig dest = map reverse $ reconstruct predMap orig dest
 
 -- travelSales
 
+mapToIndexes :: Ord a => [a] -> Map a Int
+mapToIndexes xs = mapFromList $ zip xs [0..]
+
+toAdjMatrix :: RoadMap -> Map City Int -> AdjMatrix
+toAdjMatrix roadMap indexMap = Data.Array.accumArray (\_ d -> Just d) Nothing ((0, 0), (numCities - 1, numCities - 1)) edges
+  where
+    numCities :: Int
+    numCities = sizeMap indexMap
+
+    getIndex :: City -> Int
+    getIndex city = unjust $ lookupMap indexMap city
+
+    edges :: [((Int,Int),Distance)]
+    edges = [((getIndex c1, getIndex c2), d) | (c1, c2, d) <- roadMap ++ reverseGraph roadMap]
+
+type TspEntry = (Maybe Distance,[Int])
+
+heldKarp :: AdjMatrix -> TspEntry
+heldKarp adjMatrix = dp Data.Array.! (start, fullBitmask (numCities - 1))
+  where
+    numCities :: Int
+    numCities = snd (snd $ Data.Array.bounds adjMatrix) + 1
+
+    start :: Int
+    start = numCities - 1
+
+    dp :: Data.Array.Array (Int,Bitmask) TspEntry
+    dp = Data.Array.listArray bounds [getTspEntry city bitmask | city <- [0..numCities - 1], bitmask <- [0..fullBitmask numCities]]
+      where
+        bounds :: ((Int,Bitmask),(Int,Bitmask))
+        bounds = ((0,emptyBitmask),(numCities - 1,fullBitmask numCities))
+
+        compEntry :: TspEntry -> TspEntry -> Ordering
+        compEntry (Just dist1,_) (Just dist2,_) = dist1 `compare` dist2
+        compEntry (Just _,_) (Nothing,_) = LT
+        compEntry (Nothing,_) (Just _,_) = GT
+        compEntry (Nothing,_) (Nothing,_) = EQ
+
+        addCity :: TspEntry -> Int -> TspEntry
+        addCity (Nothing, path) city  = (Nothing, city : path)
+        addCity (Just totalDist, pred:pathTail) city = case adjMatrix Data.Array.! (city, pred) of
+          Just dist -> (Just (totalDist + dist), city : pred: pathTail)
+          Nothing   -> (Nothing, city : pred: pathTail)
+
+        getTspEntry :: Int -> Bitmask -> TspEntry
+        getTspEntry city bitmask
+          | bitmask == emptyBitmask = (adjMatrix Data.Array.! (city, start), [city, start])
+          | otherwise               = Data.List.minimumBy compEntry
+            [addCity (dp Data.Array.! (other, clearBit bitmask other)) city | other <- bitmaskToList bitmask]
+
 travelSales :: RoadMap -> Path
-travelSales = undefined
+travelSales roadMap = case heldKarp adjMatrix of
+  (Just _, path) -> map getCity path
+  (Nothing, _)   -> []
+  where
+    indexMap :: Map City Int
+    indexMap = mapToIndexes $ cities roadMap
+
+    adjMatrix :: AdjMatrix
+    adjMatrix = toAdjMatrix roadMap indexMap
+
+    cityMap :: Map Int City
+    cityMap = mapFromList $ map (\(x,y) -> (y,x)) (mapToList indexMap)
+
+    getCity :: Int -> City
+    getCity index = unjust $ lookupMap cityMap index
 
 -- Some graphs to test your work
 gTest1 :: RoadMap

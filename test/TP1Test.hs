@@ -250,9 +250,9 @@ rotate :: [a] -> Int -> [a]
 rotate xs n = let (xs1, xs2) = splitAt n (reverse xs)
   in reverse xs1 ++ reverse xs2
 
-isRotationOf :: Eq a => [a] -> [a] -> Bool
-isRotationOf (x:xs) ys = case elemIndex x ys of
-  Just n  -> rotate (x:xs) n == ys
+sameCircuit :: [City] -> [City] -> Bool
+sameCircuit (x:xs) (y:ys) = case elemIndex x ys of
+  Just n  -> rotate xs n == ys || rotate xs (length xs - n) == reverse ys
   Nothing -> False
 
 -- Main
@@ -428,8 +428,8 @@ main = hspec $ do
 
   describe "travelSales" $ do
     it "Determines correct circuit" $ do
-      travelSales gTest1 `shouldSatisfy` isRotationOf ["0", "1", "2", "3", "4", "5", "6", "8", "7", "0"]
-      travelSales gTest2 `shouldSatisfy` isRotationOf ["0", "1", "3", "2", "0"]
+      travelSales gTest1 `shouldSatisfy` sameCircuit ["0", "1", "2", "3", "4", "5", "6", "8", "7", "0"]
+      travelSales gTest2 `shouldSatisfy` sameCircuit ["0", "1", "3", "2", "0"]
 
     it "Checks if no hamiltonian circuit exists" $ do
       travelSales gTest3 `shouldBe` []
