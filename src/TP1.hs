@@ -44,7 +44,7 @@ isBitSet (Bitmask bits) = Data.Bits.testBit bits
 -- Set implementation based on an AVL Tree
 
 data Set a = SEmpty | SNode a (Set a) (Set a) Int
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq)
 
 emptySet :: Set a
 emptySet = SEmpty
@@ -119,6 +119,7 @@ instance (Ord k) => Ord (MEntry k v) where
   (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
 
 newtype (Ord k) => Map k v = Map (Set (MEntry k v))
+  deriving (Show, Eq)
 
 emptyMap :: (Ord k) => Map k v
 emptyMap = Map emptySet
@@ -143,6 +144,7 @@ mapToList (Map (SNode (MEntry k v) l r _)) = mapToList (Map l) ++ [(k, v)] ++ ma
 -- Binary Heap
 
 data (Ord a) => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
+  deriving (Show, Eq)
 
 emptyHeap :: Heap a
 emptyHeap = HEmpty
@@ -191,20 +193,20 @@ removeLast (HNode x size left right)
 
 heapifyDown :: (Ord a) => Heap a -> Heap a
 heapifyDown (HNode x size left@(HNode y size' left' right') right@(HNode z size'' left'' right''))
-  | y < x && y < z = HNode y size (HNode x size' left' right') right
-  | z < x = HNode z size left (HNode x size'' left'' right'')
+  | y < x && y < z = HNode y size (heapifyDown $ HNode x size' left' right') right
+  | z < x           = HNode z size left (heapifyDown $ HNode x size'' left'' right'')
 heapifyDown (HNode x size (HNode y size' left' right') HEmpty)
-  | y < x = HNode y size (HNode x size' left' right') HEmpty
+  | y < x = HNode y size (heapifyDown $ HNode x size' left' right') HEmpty
 heapifyDown (HNode x size HEmpty (HNode y size' left' right'))
-  | y < x = HNode y size (HNode x size' left' right') HEmpty
+  | y < x = HNode y size HEmpty (heapifyDown $ HNode x size' left' right')
 heapifyDown heap = heap
 
 heapPopMin :: (Ord a) => Heap a -> (a, Heap a)
 heapPopMin heap =
   let (lastVal, newTree) = removeLast heap
-   in case newTree of
-        (HNode x size left right) -> (x, heapifyDown (HNode lastVal size left right))
-        HEmpty -> (lastVal, HEmpty)
+  in case newTree of
+    (HNode x size left right) -> (x, heapifyDown (HNode lastVal size left right))
+    HEmpty                    -> (lastVal, HEmpty)
 
 heapIsEmpty :: (Ord a) => Heap a -> Bool
 heapIsEmpty HEmpty = True

@@ -27,10 +27,15 @@ instance Arbitrary GoodCity where
 
   shrink (GoodCity [char]) = [GoodCity [newChar] | newChar <- ['A'..chr $ ord char - 1]]
 
+goodCityBesides :: City -> Gen GoodCity
+goodCityBesides other = do
+  char <- elements [x | x <- ['A'..'I'], x /= head other]
+  return $ GoodCity [char]
+
 instance Arbitrary GoodEdge where
   arbitrary = do
     GoodCity orig <- arbitrary
-    GoodCity dest <- arbitrary `suchThat` (/= GoodCity orig)
+    GoodCity dest <- goodCityBesides orig
     Positive dist <- arbitrary
     return $ GoodEdge (orig, dest, dist)
 
@@ -53,7 +58,6 @@ instance Arbitrary GoodRoadMap where
     rawMap <- listOf (arbitrary :: Gen GoodEdge)
     return $ GoodRoadMap $ removeDuplicateEdges $ map coerce rawMap
 
-  shrink (GoodRoadMap []) = [GoodRoadMap []]
   shrink (GoodRoadMap roadMap) = [GoodRoadMap $ removeDuplicateEdges $ map coerce edges | edges <- shrink $ map GoodEdge roadMap]
 
 instance Arbitrary GoodPath where
@@ -63,7 +67,8 @@ instance Arbitrary GoodPath where
 
 
 forAllCities :: Testable prop => GoodRoadMap -> (GoodCity -> prop) -> Property
-forAllCities (GoodRoadMap roadMap) = forAllShrink mapCity shrink
+forAllCities (GoodRoadMap []) _ = property True
+forAllCities (GoodRoadMap roadMap) propFunc = forAllShrink mapCity shrink propFunc
   where
     mapCity :: Gen GoodCity
     mapCity = do
@@ -237,7 +242,7 @@ prop_shortestPathSubstructure :: GoodRoadMap -> Property
 prop_shortestPathSubstructure goodRoadMap@(GoodRoadMap roadMap) =
   forAllCities goodRoadMap $ \(GoodCity city1) ->
   forAllCities goodRoadMap $ \(GoodCity city2) ->
-    all (\path -> length path == 2 || tail path `elem` shortestPath roadMap (path !! 1) city2) $ shortestPath roadMap city1 city2
+    conjoin $ map (\path -> length path > 2 ==> tail path `elem` shortestPath roadMap (path !! 1) city2) $ shortestPath roadMap city1 city2
 
 -- Main
 
@@ -404,8 +409,8 @@ main = hspec $ do
     it "Checks if no path exists" $ do
       shortestPath gTest3 "0" "2" `shouldBe` []
 
-    -- prop "Shortest paths start and end on the right cities"
-    --   prop_shortestPathCorrectEnds
+    prop "Shortest paths start and end on the right cities"
+      prop_shortestPathCorrectEnds
 
-    -- prop "Shortest paths respect optimal substructure"
-    --   prop_shortestPathSubstructure
+    prop "Shortest paths respect optimal substructure"
+      prop_shortestPathSubstructure
