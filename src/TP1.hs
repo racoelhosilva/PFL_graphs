@@ -87,7 +87,7 @@ toAdjMap roadMap = foldl insertEdge emptyMap (roadMap ++ reverseGraph roadMap)
 -- | Convert a roadmap into an adjacency matrix representation.
 --
 --   Efficiency:
---     * Time Complexity: O(V²)
+--     * Time Complexity: O(V^2 + E log E)
 --
 --   Arguments:
 --     * Roadmap: representation of the graph.
@@ -137,9 +137,12 @@ emptyBitmask = 0
 --     * Bitmask: bitmask with all bits set to 1.
 fullBitmask :: Int -> Bitmask
 fullBitmask n
-  | n >= 0 && n < 30 = 1 `Data.Bits.shiftL` n - 1
-  | n == 30 = minBound :: Int
+  | n >= 0 && n <= maxBits = 1 `Data.Bits.shiftL` n - 1
   | otherwise = error "Bitmask representation size out of bounds"
+  where
+    -- | Maximum number of bits in a number of type Int.
+    maxBits :: Int
+    maxBits = Data.Bits.finiteBitSize (-1 :: Int) - 1
 
 -- | Sets a bit in the bitmask.
 --
