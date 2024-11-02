@@ -99,12 +99,21 @@ toAdjMap roadMap = foldl insertEdge emptyMap (roadMap ++ reverseGraph roadMap)
 toAdjMatrix :: RoadMap -> Map City Int -> AdjMatrix
 toAdjMatrix roadMap indexMap = Data.Array.accumArray (\_ d -> Just d) Nothing ((0, 0), (numCities - 1, numCities - 1)) edges
   where
+    -- | Number of cities in the graph.
     numCities :: Int
     numCities = mapSize indexMap
 
+    -- | Index of the city, according to the indexMap defined.
+    --
+    --   Arguments:
+    --     * City: city to retrieve the index.
+    --
+    --   Returns:
+    --     * Int: index of the city in the map.
     getIndex :: City -> Int
     getIndex city = unjust $ mapLookup indexMap city
 
+    -- | Edge list represented as a pair of indices and a distance.
     edges :: [((Int, Int), Distance)]
     edges = [((getIndex c1, getIndex c2), d) | (c1, c2, d) <- roadMap ++ reverseGraph roadMap]
 
@@ -310,7 +319,7 @@ data MEntry k v = MEntry k v
 instance (Eq k) => Eq (MEntry k v) where
   -- | Equality (==) operator for the Entry type.
   (MEntry k1 _) == (MEntry k2 _) = k1 == k2
-  
+
 instance (Ord k) => Ord (MEntry k v) where
   -- | Compare operator for the Entry type.
   (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
@@ -391,7 +400,7 @@ mapToList (Map (SNode (MEntry k v) l r _)) = mapToList (Map l) ++ [(k, v)] ++ ma
 -- | Implementation of a binary min heap.
 --
 -- The heap is represented as a leftist tree, storing its value, rank and subtrees for each node.
--- 
+--
 --  Arguments:
 --   * a: Type of the values stored in the heap.
 data (Ord a) => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
@@ -433,13 +442,13 @@ heapMin (HNode min _ _ _) = min
 --     * a: top value of the heap.
 --     * Heap a: first heap.
 --     * Heap a: second heap.
---   
+--
 --   Returns:
 --     * Heap a: resulting heap.
 heapBuild :: (Ord a) => a -> Heap a -> Heap a -> Heap a
 heapBuild x h1 h2
   | heapRank h1 >= heapRank h2 = HNode x (heapRank h2 + 1) h1 h2
-  | otherwise = HNode x (heapRank h1 + 1) h2 h1 
+  | otherwise = HNode x (heapRank h1 + 1) h2 h1
 
 -- | Merges two heaps into a single heap.
 --
@@ -481,7 +490,7 @@ heapInsert heap x = heapMerge (HNode x 1 HEmpty HEmpty) heap
 --   Returns:
 --     * (a, Heap a): Pair of the minimum value and the popped heap.
 heapPopMin :: (Ord a) => Heap a -> (a, Heap a)
-heapPopMin HEmpty = error "Cannot pop empty heap"
+heapPopMin HEmpty          = error "Cannot pop empty heap"
 heapPopMin (HNode x _ r l) = (x, heapMerge r l)
 
 -- | Checks if the heap is empty.
@@ -542,7 +551,7 @@ reverseEdge (orig, dest, dist) = (dest, orig, dist)
 --
 --   Efficiency:
 --     * Time Complexity: O(E)
--- 
+--
 --   Arguments:
 --     * Roadmap: representation of the graph.
 --
@@ -590,7 +599,7 @@ sortedAdjacents roadMap (city : cities) = adjacent : sortedAdjacents subRoadMap 
         (subAdjacents, finalRoadMap) = sortedAdjacent subRoadMap city
 
 -- | Sorts the list and removes all duplicate elements.
--- 
+--
 --   Efficiency:
 --     * Time Complexity: O(N log N)
 --
@@ -796,7 +805,7 @@ isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- citie
     -- | Adjacency map representation of the roadmap.
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
-    
+
     -- | Starting city for the DFS search.
     root :: City
     root = orig $ head roadMap
@@ -858,14 +867,15 @@ shortestPath roadMap orig dest = case mapLookup pathMap dest of
     -- | Adjacency map representation of the roadmap.
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
-    
-    p
+
+    -- | Map that links each city to its predecessors after the Dijkstra algorithm
+    pathMap :: Map City Predecessors
     pathMap = dijkstra emptyMap (heapInsert emptyHeap (0, orig, [[orig]]))
 
     dijkstra :: Map City Predecessors -> Heap DijkstraState -> Map City Predecessors
     dijkstra predMap heap
       | heapIsEmpty heap = predMap
-     athMap  | otherwise = newMap
+      | otherwise = newMap
       where
         newDist :: Distance
         city :: City
@@ -906,17 +916,28 @@ travelSales roadMap = case heldKarp adjMatrix of
   (Just _, path) -> map getCity path
   (Nothing, _)   -> []
   where
+    -- | Map that converts cities into Int indexes.
     indexMap :: Map City Int
     indexMap = mapToIndexes $ cities roadMap
 
+    -- | Adjacency matrix representation of the roadmap.
     adjMatrix :: AdjMatrix
     adjMatrix = toAdjMatrix roadMap indexMap
 
+    -- | Reverse of the indexMap, converts Int indexes into cities.
     cityMap :: Map Int City
     cityMap = mapFromList $ map (\(x, y) -> (y, x)) (mapToList indexMap)
 
+    -- | Given an index, returns the corresponding city, according to the cityMap.
+    --
+    --   Arguments:
+    --     * Int: index to access.
+    --
+    --   Returns:
+    --     * City: city associated with that index.
     getCity :: Int -> City
     getCity index = unjust $ mapLookup cityMap index
+
 
     heldKarp :: AdjMatrix -> TspEntry
     heldKarp adjMatrix = dp Data.Array.! (start, fullBitmask (numCities - 1))
