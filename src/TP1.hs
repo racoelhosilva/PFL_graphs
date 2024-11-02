@@ -44,12 +44,15 @@ type AdjMatrix = Data.Array.Array (Int, Int) (Maybe Distance)
 toAdjList :: RoadMap -> AdjList
 toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCities adjs revAdjs
   where
+    -- | All cities in the roadmap.
     mapCities :: [City]
     mapCities = cities roadMap
 
+    -- | List of list of city/distance pairs for each city in the roadmap, in order.
     adjs :: [[(City, Distance)]]
     adjs = sortedAdjacents (Data.List.sort roadMap) mapCities
 
+    -- | List of list of city/distance pairs for each city in the reverse roadmap (all edges flipped), in order.
     revAdjs :: [[(City, Distance)]]
     revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
 
@@ -66,6 +69,14 @@ toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCit
 toAdjMap :: RoadMap -> AdjMap
 toAdjMap roadMap = foldl insertEdge emptyMap (roadMap ++ reverseGraph roadMap)
   where
+    -- | Inserts an edge into the empty.
+    --
+    --   Arguments:
+    --     * AdjMap: representation of the graph.
+    --     * (City, City, Distance): edge to insert into the graph.
+    --
+    --   Returns:
+    --     * AdjMap: resulting representation of the graph.
     insertEdge :: AdjMap -> (City, City, Distance) -> AdjMap
     insertEdge map (orig, dest, dist) = mapInsert map orig ((dest, dist) : oldAdj)
       where
@@ -133,32 +144,76 @@ bitmaskToList bitmask = toListAcc bitmask 0
 
 {- Data Structures: Set (AVL Tree) -}
 
+-- | Set data structure based on an AVL Tree.
 data Set a = SEmpty | SNode a (Set a) (Set a) Int
   deriving (Show, Eq)
 
+-- | Returns an empty set.
 emptySet :: Set a
 emptySet = SEmpty
 
+-- | Returns the height of a set.
+--
+--   Arguments:
+--     * Set a: set to obtain the height.
+--
+--   Returns:
+--     * Int: height of the set.
 setHeight :: Set a -> Int
 setHeight SEmpty          = 0
 setHeight (SNode _ _ _ h) = h
 
+-- | Recalculates the heights of a set node.
+--
+--   Arguments:
+--     * Set a: set node to recalculate height.
+--
+--   Returns:
+--     * Set a: resulting set with the recalculated height.
 setUpdateHeight :: Set a -> Set a
 setUpdateHeight SEmpty = SEmpty
 setUpdateHeight (SNode v l r _) = SNode v l r (1 + max (setHeight l) (setHeight r))
 
+-- | Balance factor of a set.
+--
+--   Arguments:
+--     * Set a: set node to recalculate height.
+--
+--   Returns:
+--     * Int: Balance factor between the left and right children.
 setBalanceFactor :: Set a -> Int
 setBalanceFactor SEmpty          = 0
 setBalanceFactor (SNode _ l r _) = setHeight l - setHeight r
 
+-- | Performs a right rotation on the set node.
+--
+--   Arguments:
+--     * Set a: set to perform the right rotation.
+--
+--   Returns:
+--     * Set a: resulting set after the rotation.
 setRotateRight :: Set a -> Set a
 setRotateRight (SNode y (SNode x l lx h2) r h1) = setUpdateHeight $ SNode x l (setUpdateHeight (SNode y lx r undefined)) undefined
 setRotateRight s = s
 
+-- | Performs a left rotation on the set node.
+--
+--   Arguments:
+--     * Set a: set to perform the left rotation.
+--
+--   Returns:
+--     * Set a: resulting set after the rotation.
 setRotateLeft :: Set a -> Set a
 setRotateLeft (SNode x l (SNode y rx r h2) h1) = setUpdateHeight $ SNode y (setUpdateHeight (SNode x l rx undefined)) r undefined
 setRotateLeft s = s
 
+-- | Balances the current set based on left and right rotations.
+--
+--   Arguments:
+--     * Set a: set to perform the balance operation.
+--
+--   Returns:
+--     * Set a: resulting set after the balance operation.
 setBalance :: Set a -> Set a
 setBalance (SNode val l r h)
   | bf > 1 && setBalanceFactor l >= 0 = setRotateRight (SNode val l r h)
@@ -170,6 +225,17 @@ setBalance (SNode val l r h)
     bf = setBalanceFactor (SNode val l r h)
 setBalance s = s
 
+-- | Inserts a new element into the set. If the element exists, replaces it (useful for Map implementation).
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Set a: set to perform the insert.
+--     * a: element to insert into the set.
+--
+--   Returns:
+--     * Set a: resulting node of the element inserted.
 setInsert :: (Ord a) => Set a -> a -> Set a
 setInsert SEmpty newVal = SNode newVal SEmpty SEmpty 1
 setInsert (SNode val l r h) newVal
@@ -177,6 +243,17 @@ setInsert (SNode val l r h) newVal
   | val < newVal = setBalance (SNode val l (setInsert r newVal) h)
   | otherwise = SNode newVal l r h
 
+-- | Checks whether the set contains a specific element.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Set a: set to check if element is contained.
+--     * a: element to check.
+--
+--   Returns:
+--     * Bool: True if the set contains the element, False otherwise.
 setContains :: (Ord a) => Set a -> a -> Bool
 setContains SEmpty _ = False
 setContains (SNode val l r h) target
@@ -184,102 +261,263 @@ setContains (SNode val l r h) target
   | val < target = setContains r target
   | otherwise = True
 
-searchSet :: (Ord a) => Set a -> a -> Set a
-searchSet SEmpty _ = SEmpty
-searchSet (SNode val l r h) target
-  | val > target = searchSet l target
-  | val < target = searchSet r target
+-- | Searches the set for the element.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Set a: set to search for the element.
+--     * a: element to search.
+--
+--   Returns:
+--     * Set a: Node of the element searched, empty node otherwise.
+setSearch :: (Ord a) => Set a -> a -> Set a
+setSearch SEmpty _ = SEmpty
+setSearch (SNode val l r h) target
+  | val > target = setSearch l target
+  | val < target = setSearch r target
   | otherwise = SNode val l r h
 
+-- | Size of the set (number of elements).
+--
+--   Arguments:
+--     * Set a: set to retrieve the size.
+--
+--   Returns:
+--     * Int: Size of the set.
 setSize :: Set a -> Int
 setSize SEmpty          = 0
 setSize (SNode _ l r _) = 1 + setSize l + setSize r
 
+-- | Converts the set to a list.
+--
+--   Arguments:
+--     * Set a: set to convert to list.
+--
+--   Returns:
+--     * [a]: List resulting of the set conversion
 setToList :: Set a -> [a]
 setToList SEmpty          = []
 setToList (SNode v l r _) = setToList l ++ [v] ++ setToList r
 
 {- Data Structures: Map -}
 
+-- | Key value pair for the map.
 data MEntry k v = MEntry k v
   deriving (Show)
 
 instance (Eq k) => Eq (MEntry k v) where
+  -- | Equality (==) operator for the Entry type.
   (MEntry k1 _) == (MEntry k2 _) = k1 == k2
   
 instance (Ord k) => Ord (MEntry k v) where
+  -- | Compare operator for the Entry type.
   (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
 
+-- | Map data structure based on the Set and Entry types.
 newtype (Ord k) => Map k v = Map (Set (MEntry k v))
   deriving (Show, Eq)
 
 emptyMap :: (Ord k) => Map k v
 emptyMap = Map emptySet
 
+-- | Insert a key and value into a map. Replaces the value if the key already exists (due to the set implementation)
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Map k v: map to insert the elements.
+--     * k: key of the pair.
+--     * v: value of the pair.
+--
+--   Returns:
+--     * Map k v: Resulting map after the insertion.
 mapInsert :: (Ord k) => Map k v -> k -> v -> Map k v
 mapInsert (Map s) key value = Map (setInsert s (MEntry key value))
 
+-- | Retrieves the value of a key in a map, it the pair exists.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Map k v: map to retrieve the element.
+--     * k: key of the pair.
+--
+--   Returns:
+--     * Maybe v: Just v in case the key value pair exists, Nothing if the key isn't matched.
 mapLookup :: (Ord k) => Map k v -> k -> Maybe v
 mapLookup (Map s) key =
-  case searchSet s (MEntry key undefined) of
+  case setSearch s (MEntry key undefined) of
     SEmpty                   -> Nothing
     SNode (MEntry _ v) _ _ _ -> Just v
 
+-- | Retrieves the size of the map (number of entries).
+--
+--   Arguments:
+--     * Map k v: map to retrieve the size.
+--
+--   Returns:
+--     * Int: Size of the map.
 mapSize :: (Ord k) => Map k v -> Int
 mapSize (Map s) = setSize s
 
+-- | Creates a map from a list of key value pairs.
+--
+--   Arguments:
+--     * [(k,v)]: list of key value pairs to be inserted.
+--
+--   Returns:
+--     * Map k v: the map with the key value pairs as entries.
 mapFromList :: (Ord k) => [(k, v)] -> Map k v
 mapFromList []                     = emptyMap
 mapFromList ((key, val) : subList) = mapInsert (mapFromList subList) key val
 
+-- | Converts the map of key value entries into a list.
+--
+--   Arguments:
+--     * Map k v: the map with the key value pairs as entries.
+--
+--   Returns:
+--     * [(k,v)]: list of key value pairs.
 mapToList :: (Ord k) => Map k v -> [(k, v)]
 mapToList (Map SEmpty) = []
 mapToList (Map (SNode (MEntry k v) l r _)) = mapToList (Map l) ++ [(k, v)] ++ mapToList (Map r)
 
-{- Data Structures: Binary (Min) Heap -}
+{- Data Structures: Binary Heap -}
 
+-- | Implementation of a binary min heap.
+--
+-- The heap is represented as a leftist tree, storing its value, rank and subtrees for each node.
+-- 
+--  Arguments:
+--   * a: Type of the values stored in the heap.
 data (Ord a) => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
   deriving (Show, Eq)
 
+-- | Returns an empty heap.
 emptyHeap :: Heap a
 emptyHeap = HEmpty
 
+-- | Returns the rank of a heap node.
+--
+--   Arguments:
+--     * Heap a: heap to obtain the rank.
 heapRank :: (Ord a) => Heap a -> Int
 heapRank HEmpty          = 0
 heapRank (HNode _ r _ _) = r
 
+-- | Returns the minimum value in the heap.
+--
+--   Efficiency:
+--     * Time Complexity: O(1)
+--
+--   Arguments:
+--     * Heap a: heap to obtain the minimum value.
 heapMin :: (Ord a) => Heap a -> a
 heapMin HEmpty            = error "Cannot pop empty heap"
 heapMin (HNode min _ _ _) = min
 
+-- | Builds a new heap, given two heaps and a top value.
+--
+--   This function verifies that the resulting heap remains a leftist tree,
+--   by comparing the rank of the two subtrees, and updates the rank
+--   of the new heap accordingly.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * a: top value of the heap.
+--     * Heap a: first heap.
+--     * Heap a: second heap.
+--   
+--   Returns:
+--     * Heap a: resulting heap.
 heapBuild :: (Ord a) => a -> Heap a -> Heap a -> Heap a
 heapBuild x h1 h2
   | heapRank h1 >= heapRank h2 = HNode x (heapRank h2 + 1) h1 h2
   | otherwise = HNode x (heapRank h1 + 1) h2 h1 
 
+-- | Merges two heaps into a single heap.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Heap a: first heap to merge.
+--     * Heap a: second heap to merge.
 heapMerge :: (Ord a) => Heap a -> Heap a -> Heap a
 heapMerge h HEmpty = h
 heapMerge HEmpty h = h
 heapMerge h1@(HNode x _ l1 r1) h2@(HNode y _ l2 r2)
   | x <= y = heapBuild x l1 (heapMerge r1 h2)
   | otherwise = heapBuild y l2 (heapMerge h1 r2)
-  
+
+-- | Inserts a new value into the heap.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Heap a: heap to insert the value.
+--     * a: value to insert.
+--
+--   Returns:
+--     * Heap a: resulting heap.
 heapInsert :: (Ord a) => Heap a -> a -> Heap a
 heapInsert heap x = heapMerge (HNode x 1 HEmpty HEmpty) heap
 
+-- | Removes the minimum value from the heap.
+--
+--   Efficiency:
+--     * Time Complexity: O(log N)
+--
+--   Arguments:
+--     * Heap a: heap to remove the minimum value.
+--
+--   Returns:
+--     * (a, Heap a): Pair of the minimum value and the popped heap.
 heapPopMin :: (Ord a) => Heap a -> (a, Heap a)
 heapPopMin HEmpty = error "Cannot pop empty heap"
 heapPopMin (HNode x _ r l) = (x, heapMerge r l)
 
+-- | Checks if the heap is empty.
+--
+--   Efficiency:
+--     * Time Complexity: O(1)
+--
+--   Arguments:
+--     * Heap a: heap to check if it is empty.
 heapIsEmpty :: (Ord a) => Heap a -> Bool
 heapIsEmpty HEmpty = True
 heapIsEmpty _      = False
 
 {- Auxiliary Functions -}
 
+-- | Converts a list of items into a map of items to Int.
+--
+--   Arguments:
+--     * [a]: list of items to be converted.
+--
+--   Returns:
+--     * Map a Int: Map of the items to Int values.
 mapToIndexes :: (Ord a) => [a] -> Map a Int
-mapToIndexes xs = mapFromList $ zip xs [0 ..]
+mapToIndexes xs = mapFromList $ zip xs [0..]
 
+-- | Merges two sorted lists into a single sorted list.
+--
+--   Efficiency:
+--     * Time Complexity: O(N + M)
+--       and second lists, respectively.
+--
+--   Arguments:
+--     * [a]: sorted list number 1.
+--     * [a]: sorted list number 2.
+--   Returns:
+--     * [a]: Resulting sorted list.
 merge :: (Ord a) => [a] -> [a] -> [a]
 merge xs [] = xs
 merge [] ys = ys
@@ -287,36 +525,106 @@ merge (x : xs) (y : ys)
   | x <= y = x : merge xs (y : ys)
   | otherwise = y : merge (x : xs) ys
 
+-- | Given an edge of the roadmap, returns the reverse edge.
+--
+--   Efficiency:
+--     * Time Complexity: O(1)
+--
+--   Arguments:
+--     * (City, City, Distance): edge of the roadmap.
+--
+--   Returns:
+--     * (City, City, Distance): Reverse of the edge given.
 reverseEdge :: (City, City, Distance) -> (City, City, Distance)
 reverseEdge (orig, dest, dist) = (dest, orig, dist)
 
+-- | Given a roadmap, returns the reverse graph.
+--
+--   Efficiency:
+--     * Time Complexity: O(E)
+-- 
+--   Arguments:
+--     * Roadmap: representation of the graph.
+--
+--   Returns:
+--     * Roadmap: representation of the reverse graph (edge directions are switched).
 reverseGraph :: RoadMap -> RoadMap
 reverseGraph roadMap = [reverseEdge edge | edge <- roadMap]
 
-sortedAdjacent :: RoadMap -> City -> ([(City, Distance)], RoadMap)
-sortedAdjacent [] _ = ([], [])
-sortedAdjacent ((orig, dest, dist) : subRoadMap) city
-  | orig == city = ((dest, dist) : subAdjacents, finalRoadMap)
-  | otherwise = ([], (orig, dest, dist) : subRoadMap)
-  where
-    (subAdjacents, finalRoadMap) = sortedAdjacent subRoadMap city
-
+-- | Given an ordered roadmap and a list of ordered cities, returns the list of
+--   all adjacents (and distances) of the cities in the same order of the
+--   argument.
+--
+--   Efficiency:
+--     * Time Complexity: O(E)
+--
+--   Arguments:
+--     * Roadmap: sorted representation of the graph.
+--     * [City]: ordered list of cities to retrieve the adjacents.
+--
+--   Returns:
+--     * [[(City, Distance)]]: List of list of adjacents (and distances) of the cities passed.
 sortedAdjacents :: RoadMap -> [City] -> [[(City, Distance)]]
 sortedAdjacents _ [] = []
 sortedAdjacents roadMap (city : cities) = adjacent : sortedAdjacents subRoadMap cities
   where
+    adjacent :: [(City, Distance)]
+    subRoadMap :: RoadMap
     (adjacent, subRoadMap) = sortedAdjacent roadMap city
 
+    -- | Given an ordered roadmap and a city, returns the pair of sorted adjacents
+    --   (and distances) and the rest of the roadmap.
+    --
+    --   Arguments:
+    --     * Roadmap: sorted representation of the graph.
+    --     * City: given city to retrieve the adjacents.
+    --
+    --   Returns:
+    --     * ([(City, Distance)], Roadmap): Pair of the sorted adjacents (and distances) and the rest of the roadmap.
+    sortedAdjacent :: RoadMap -> City -> ([(City, Distance)], RoadMap)
+    sortedAdjacent [] _ = ([], [])
+    sortedAdjacent ((orig, dest, dist) : subRoadMap) city
+      | orig == city = ((dest, dist) : subAdjacents, finalRoadMap)
+      | otherwise = ([], (orig, dest, dist) : subRoadMap)
+      where
+        (subAdjacents, finalRoadMap) = sortedAdjacent subRoadMap city
+
+-- | Sorts the list and removes all duplicate elements.
+-- 
+--   Efficiency:
+--     * Time Complexity: O(N log N)
+--
+--   Arguments:
+--     * [a]: initial list.
+--
+--   Returns:
+--     * [a]: Final list, sorted and with a single occurrence for each item.
 sortUnique :: (Ord a) => [a] -> [a]
 sortUnique xs = unique $ Data.List.sort xs
 
+-- | Removes adjacent duplicate values in a list.
+--
+--   Efficiency:
+--     * Time Complexity: O(N)
+--
+--   Arguments:
+--     * [a]: initial list.
+--
+--   Returns:
+--   * [a]: Final list with single occurrences for each item.
 unique :: (Eq a) => [a] -> [a]
 unique [] = []
 unique [x] = [x]
 unique (x1 : x2 : xs)
   | x1 == x2 = unique (x2 : xs)
   | otherwise = x1 : unique (x2 : xs)
-
+-- | Unpacks a Just value, returning the value inside, or an undefined value if the argument is Nothing.
+--
+--   Arguments:
+--     * Maybe a: Maybe value to unpack.
+--
+--   Returns:
+--     * a: Unpacked value in case the argument is a Just. Undefined otherwise.
 unjust :: Maybe a -> a
 unjust (Just x) = x
 unjust Nothing  = undefined
@@ -332,16 +640,21 @@ unjust Nothing  = undefined
 --     * Roadmap: representation of the graph.
 --
 --   Returns:
---     * [City]: List of the cities (vertices) in the roadmap (graph).
+--     * [City]: List of the cities (vertices) in the roadmap .
 cities :: RoadMap -> [City]
 cities [] = []
 cities r = sortUnique $ citySelect r
   where
     -- | Retrieves a list that, for each edge, contains both the start and end cities.
+    --
+    --   Efficiency:
+    --     * Time Complexity: O(E)
+    --
     --   Arguments:
     --     * Roadmap: representation of the graph.
+    --
     --   Returns:
-    --     * [City]: All cities taken from the start or end of the edges in the roadmap.
+    --     * [City]: Sorted list of all cities taken from the start or end of the edges in the roadmap.
     citySelect :: RoadMap -> [City]
     citySelect []               = []
     citySelect ((a, b, _) : xs) = a : b : citySelect xs
@@ -361,15 +674,18 @@ cities r = sortUnique $ citySelect r
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent roadMap city1 city2 = any connectsCities roadMap
   where
-    -- | Checks if there an edge connects the two given cities (in either direction).
+    -- | Checks if the edge connects the two given cities (in either direction).
+    --
     --   Arguments:
     --     * (City, City, Distance): edge of the roadmap.
+    --
     --   Returns:
     --     * Bool: True if the edge connects them, False otherwise.
     connectsCities :: (City, City, Distance) -> Bool
     connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
--- | Returns the distance between two cities in a roadmap, if they are adjacent.
+-- | Returns the distance between two cities in a roadmap, if they are adjacent,
+--   or Nothing if they are not.
 --
 --   Efficiency:
 --     * Time Complexity: O(E)
@@ -382,11 +698,11 @@ areAdjacent roadMap city1 city2 = any connectsCities roadMap
 --   Returns:
 --     * Maybe Distance: Just distance, if there is an edge between them, Nothing otherwise.
 distance :: RoadMap -> City -> City -> Maybe Distance
-distance roadMap city1 city2 = if null match then Nothing else Just (head match)
+distance roadMap city1 city2 = if null matches then Nothing else Just (head matches)
   where
     -- | List of the distances of edges between the given cities (presumably, between length is either 0 or 1)
-    match :: [Distance]
-    match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
+    matches :: [Distance]
+    matches = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
 -- | Returns all of the cities adjacent to a city in a roadmap, as well as their distances.
 --
@@ -477,7 +793,7 @@ rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
 isStronglyConnected :: RoadMap -> Bool
 isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- cities roadMap]
   where
-    -- | Adjacency list representation of the roadmap.
+    -- | Adjacency map representation of the roadmap.
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
     
@@ -495,36 +811,32 @@ isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- citie
 
     -- | Set of all visited cities after the DFS.
     visitedSet :: Set City
-    visitedSet = dfs root
+    visitedSet = dfsVisit emptySet root
 
-    -- | Returns whether all the cities in the roadmap are connected.
-    --
-    --   Efficiency:
-    --     * Time Complexity: O(E log E)
-    --
+    -- | Auxiliary function, that performs a DFS search on the roadmap
     --   Arguments:
-    --     * City: starting city of the Depth First Search.
-    --
+    --     * Set City: set of visited cities until this point.
+    --     * City: current root city.
     --   Returns:
-    --     * Set City: set of visited cities by the end of the DFS.
-    dfs :: City -> Set City
-    dfs root = dfsVisit visitedSet root
+    --     * Set City: updated set of visited cities, reachable from the root city.
+    dfsVisit :: Set City -> City -> Set City
+    dfsVisit visitedSet root = getNextVisitedSet (setInsert visitedSet root) adjs
       where
-        -- | Set of all visited cities after the DFS.
-        visitedSet :: Set City
-        visitedSet = emptySet
+        -- | List of cities adjacent to the current city
+        adjs :: [City]
+        adjs = map fst (unjust $ mapLookup adjMap root)
 
-        dfsVisit :: Set City -> City -> Set City
-        dfsVisit visitedSet root = getNextVisitedSet (setInsert visitedSet root) adjs
-          where
-            adjs :: [City]
-            adjs = map fst (unjust $ mapLookup adjMap root)
-
-            getNextVisitedSet :: Set City -> [City] -> Set City
-            getNextVisitedSet visitedSet [] = visitedSet
-            getNextVisitedSet visitedSet (adj : adjs)
-              | setContains visitedSet adj = getNextVisitedSet visitedSet adjs
-              | otherwise = getNextVisitedSet (dfsVisit visitedSet adj) adjs
+        -- | Generates the next visited set of cities.
+        --   Arguments:
+        --     * Set City: set of visited cities until this point.
+        --     * City: city to be analyzed in the current iteration.
+        --   Returns:
+        --     * Set City: updated set of visited cities.
+        getNextVisitedSet :: Set City -> [City] -> Set City
+        getNextVisitedSet visitedSet [] = visitedSet
+        getNextVisitedSet visitedSet (adj : adjs)
+          | setContains visitedSet adj = getNextVisitedSet visitedSet adjs
+          | otherwise = getNextVisitedSet (dfsVisit visitedSet adj) adjs
 
 -- | Returns all the shortest paths that connect two cities in a roadmap.
 --
@@ -543,34 +855,40 @@ shortestPath roadMap orig dest = case mapLookup pathMap dest of
   (Just (_, paths)) -> map reverse paths
   Nothing           -> []
   where
+    -- | Adjacency map representation of the roadmap.
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
+    
+    p
+    pathMap = dijkstra emptyMap (heapInsert emptyHeap (0, orig, [[orig]]))
 
-    pathMap = dijkstra adjMap emptyMap (heapInsert emptyHeap (0, orig, [[orig]]))
-
-    dijkstra :: AdjMap -> Map City Predecessors -> Heap DijkstraState -> Map City Predecessors
-    dijkstra adjMap predMap heap
+    dijkstra :: Map City Predecessors -> Heap DijkstraState -> Map City Predecessors
+    dijkstra predMap heap
       | heapIsEmpty heap = predMap
-      | otherwise = dijkstra adjMap newMap newHeap
+     athMap  | otherwise = newMap
       where
+        newDist :: Distance
+        city :: City
+        paths :: [Path]
         restHeap :: Heap DijkstraState
         ((newDist, city, paths), restHeap) = heapPopMin heap
 
-        (newMap, newHeap) = case mapLookup predMap city of
+        newMap :: Map City Predecessors
+        newMap = case mapLookup predMap city of
           Just (oldDist, oldPaths) ->
-            if newDist == oldDist
-              then (mapInsert predMap city (newDist, paths ++ oldPaths), restHeap)
-              else (predMap, restHeap)
-          Nothing -> (mapInsert predMap city (newDist, paths), updatedHeap)
+            case newDist `compare` oldDist of
+              EQ -> dijkstra (mapInsert predMap city (newDist, paths ++ oldPaths)) restHeap
+              GT -> if city == dest then predMap else dijkstra predMap restHeap
+          Nothing -> dijkstra (mapInsert predMap city (newDist, paths)) updatedHeap
 
         updatedHeap :: Heap DijkstraState
-        updatedHeap = foldl insertState restHeap adjs
+        updatedHeap = foldr insertState restHeap adjs
           where
             adjs :: [(City, Distance)]
             adjs = unjust $ mapLookup adjMap city
 
-            insertState :: Heap DijkstraState -> (City, Distance) -> Heap DijkstraState
-            insertState heap (neighbor, dist) = heapInsert heap (newDist + dist, neighbor, map (neighbor :) paths)
+            insertState :: (City, Distance) -> Heap DijkstraState -> Heap DijkstraState
+            insertState (neighbor, dist) heap = heapInsert heap (newDist + dist, neighbor, map (neighbor :) paths)
 
 -- | Returns a solution for the Traveling Salesperson Problem (the shortest hamiltonian cycle in the graph).
 --
