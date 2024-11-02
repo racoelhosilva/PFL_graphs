@@ -187,6 +187,14 @@ isBitSet = Data.Bits.testBit
 bitmaskToList :: Bitmask -> [Int]
 bitmaskToList bitmask = toListAcc bitmask 0
   where
+    -- | Auxiliary accumulator function for the conversion to list.
+    --
+    --   Arguments:
+    --     * Bitmask: bitmask to convert.
+    --     * Int: current position in the bitmask.
+    --
+    --   Returns:
+    --     * [Int]: List of positions of the set bits in the bitmask.
     toListAcc :: Bitmask -> Int -> [Int]
     toListAcc 0 _ = []
     toListAcc bitmask pos
@@ -266,6 +274,7 @@ setRotateLeft s = s
 --   Returns:
 --     * Set a: resulting set after the balance operation.
 setBalance :: Set a -> Set a
+setBalance SEmpty = SEmpty
 setBalance set@(SNode val h l r)
   | bf > 1 && setBalanceFactor l >= 0 = setRotateRight set
   | bf > 1 = setRotateRight (SNode val h (setRotateLeft l) r)
@@ -276,7 +285,6 @@ setBalance set@(SNode val h l r)
     -- | Balance factor of the given set.
     bf :: Int
     bf = setBalanceFactor set
-setBalance s = s
 
 -- | Inserts a new element into the set. If the element exists, replaces it (useful for Map implementation).
 --
@@ -650,10 +658,14 @@ sortedAdjacents roadMap (city : cities) = adjacent : sortedAdjacents subRoadMap 
     --     * ([(City, Distance)], Roadmap): Pair of the sorted adjacents (and distances) and the rest of the roadmap.
     sortedAdjacent :: RoadMap -> City -> ([(City, Distance)], RoadMap)
     sortedAdjacent [] _ = ([], [])
-    sortedAdjacent ((orig, dest, dist) : subRoadMap) city
+    sortedAdjacent roadMap@((orig, dest, dist) : subRoadMap) city
       | orig == city = ((dest, dist) : subAdjacents, finalRoadMap)
-      | otherwise = ([], (orig, dest, dist) : subRoadMap)
+      | otherwise = ([], roadMap)
       where
+        -- | List of the remaining adjacents of the city.
+        subAdjacents :: [(City, Distance)]
+        -- | Rest of the roadmap after removing the adjacent of the current city.
+        finalRoadMap :: RoadMap
         (subAdjacents, finalRoadMap) = sortedAdjacent subRoadMap city
 
 -- | Given an adjacency list, returns the list of adjacents of a city.
@@ -879,7 +891,7 @@ pathDistance roadMap path = getPathDistance sortedPairs sortedEdges
 --   Returns:
 --     * [City]: Cities with the highest degree in the roadmap.
 rome :: RoadMap -> [City]
-rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
+rome roadMap = map fst (filter (\(_, degree) -> degree == maxDegree) degrees)
   where
     -- | Adjacency list representation of the roadmap.
     adjList :: AdjList
