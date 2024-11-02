@@ -101,22 +101,22 @@ forAllPaths (GoodRoadMap roadMap) = forAllShrink mapPath shrink
 -- prop_reverseInvolution xs = reverse (reverse xs) == xs
 
 prop_emptySetContainsNoElements :: Int -> Bool
-prop_emptySetContainsNoElements y = not (containsSet emptySet y)
+prop_emptySetContainsNoElements y = not (setContains emptySet y)
 
 prop_setContainsInsertedElement :: [Int] -> Int -> Bool
-prop_setContainsInsertedElement xs y = let set = foldl insertSet emptySet xs
-  in containsSet (insertSet set y) y
+prop_setContainsInsertedElement xs y = let set = foldl setInsert emptySet xs
+  in setContains (setInsert set y) y
 
 prop_setUniqueInsertions :: [Int] -> Int -> Bool
-prop_setUniqueInsertions xs n = let set = foldl insertSet emptySet xs
-  in insertSet (insertSet set n) n == insertSet set n
+prop_setUniqueInsertions xs n = let set = foldl setInsert emptySet xs
+  in setInsert (setInsert set n) n == setInsert set n
 
 prop_setInsertionCommutativity :: [Int] -> Int -> Int -> Bool
-prop_setInsertionCommutativity xs y z = let set = foldl insertSet emptySet xs
-  in setToList (insertSet (insertSet set y) z) == setToList (insertSet (insertSet set z) y)
+prop_setInsertionCommutativity xs y z = let set = foldl setInsert emptySet xs
+  in setToList (setInsert (setInsert set y) z) == setToList (setInsert (setInsert set z) y)
 
 prop_setIsBalanced :: [Int] -> Bool
-prop_setIsBalanced xs = abs (setBalanceFactor $ foldl insertSet emptySet xs) <= 1
+prop_setIsBalanced xs = abs (setBalanceFactor $ foldl setInsert emptySet xs) <= 1
 
 prop_setIsOrdered :: [Int] -> Bool
 prop_setIsOrdered xs = isOrdered res
@@ -127,21 +127,21 @@ prop_setIsOrdered xs = isOrdered res
     isOrdered (x:y:xs) = x < y && isOrdered (y:xs)
 
     res :: [Int]
-    res = setToList $ foldl insertSet emptySet xs
+    res = setToList $ foldl setInsert emptySet xs
 
 prop_entriesWithSameKeyAreEqual :: Int -> Int -> Int -> Bool
 prop_entriesWithSameKeyAreEqual k v1 v2 = MEntry k v1 == MEntry k v2
 
 prop_emptyMapContainsNoElements :: Int -> Bool
-prop_emptyMapContainsNoElements y = isNothing (lookupMap emptyMap y)
+prop_emptyMapContainsNoElements y = isNothing (mapLookup emptyMap y)
 
 prop_mapContainsInsertedKVPair :: [(Int, Int)] -> Int -> Int -> Bool
 prop_mapContainsInsertedKVPair kvs k v = let map = mapFromList kvs
-  in unjust (lookupMap (insertMap map k v) k) == v
+  in unjust (mapLookup (mapInsert map k v) k) == v
 
 prop_repeatedMapInsertionsUpdate :: [(Int, Int)] -> Int -> Int -> Int -> Bool
 prop_repeatedMapInsertionsUpdate kvs k v1 v2 = let map = mapFromList kvs
-  in unjust (lookupMap (insertMap (insertMap map k v1) k v2) k) == v2
+  in unjust (mapLookup (mapInsert (mapInsert map k v1) k v2) k) == v2
 
 prop_mapIsOrdered :: [(Int,Int)] -> Bool
 prop_mapIsOrdered kvs = isOrdered res
@@ -159,7 +159,7 @@ prop_heapIsBalanced xs = isBalanced $ foldl heapInsert emptyHeap xs
   where
     isBalanced :: Ord a => Heap a -> Bool
     isBalanced HEmpty = True
-    isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
+    isBalanced (HNode _ _ left right) = abs (heapRank left - heapRank right) <= 1
       && isBalanced left && isBalanced right
 
 prop_heapIsOrdered :: [Int] -> Bool
@@ -188,7 +188,7 @@ prop_heapBalancedAfterExtraction (NonEmpty xs) =
       where
         isBalanced :: Ord a => Heap a -> Bool
         isBalanced HEmpty = True
-        isBalanced (HNode _ _ left right) = abs (heapSize left - heapSize right) <= 1
+        isBalanced (HNode _ _ left right) = abs (heapRank left - heapRank right) <= 1
           && isBalanced left && isBalanced right
 
 

@@ -31,6 +31,16 @@ type AdjMap = Map City [(City, Distance)]
 
 type AdjMatrix = Data.Array.Array (Int, Int) (Maybe Distance)
 
+-- | Convert a roadmap into an adjacency list representation.
+--
+--   Efficiency:
+--     * Time Complexity: O(E log E)
+--
+--   Arguments:
+--     * Roadmap: representation of the graph.
+--
+--   Returns:
+--     * AdjMatrix: representation of the graph.
 toAdjList :: RoadMap -> AdjList
 toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCities adjs revAdjs
   where
@@ -43,25 +53,46 @@ toAdjList roadMap = zipWith3 (\city adj1 adj2 -> (city, merge adj1 adj2)) mapCit
     revAdjs :: [[(City, Distance)]]
     revAdjs = sortedAdjacents (Data.List.sort $ reverseGraph roadMap) mapCities
 
+-- | Convert a roadmap into an adjacency map representation.
+--
+--   Efficiency:
+--     * Time Complexity: O(E log E)
+--
+--   Arguments:
+--     * Roadmap: representation of the graph.
+--
+--   Returns:
+--     * AdjMatrix: representation of the graph.
 toAdjMap :: RoadMap -> AdjMap
 toAdjMap roadMap = foldl insertEdge emptyMap (roadMap ++ reverseGraph roadMap)
   where
     insertEdge :: AdjMap -> (City, City, Distance) -> AdjMap
-    insertEdge map (orig, dest, dist) = insertMap map orig ((dest, dist) : oldAdj)
+    insertEdge map (orig, dest, dist) = mapInsert map orig ((dest, dist) : oldAdj)
       where
         oldAdj :: [(City, Distance)]
-        oldAdj = case lookupMap map orig of
+        oldAdj = case mapLookup map orig of
           Just adj -> adj
           Nothing  -> []
 
+-- | Convert a roadmap into an adjacency matrix representation.
+--
+--   Efficiency:
+--     * Time Complexity: O(V²)
+--
+--   Arguments:
+--     * Roadmap: representation of the graph.
+--     * Map City Int: mapping conversions of the vertices to numbers.
+--
+--   Returns:
+--     * AdjMatrix: representation of the graph.
 toAdjMatrix :: RoadMap -> Map City Int -> AdjMatrix
 toAdjMatrix roadMap indexMap = Data.Array.accumArray (\_ d -> Just d) Nothing ((0, 0), (numCities - 1, numCities - 1)) edges
   where
     numCities :: Int
-    numCities = sizeMap indexMap
+    numCities = mapSize indexMap
 
     getIndex :: City -> Int
-    getIndex city = unjust $ lookupMap indexMap city
+    getIndex city = unjust $ mapLookup indexMap city
 
     edges :: [((Int, Int), Distance)]
     edges = [((getIndex c1, getIndex c2), d) | (c1, c2, d) <- roadMap ++ reverseGraph roadMap]
@@ -120,37 +151,37 @@ setBalanceFactor :: Set a -> Int
 setBalanceFactor SEmpty          = 0
 setBalanceFactor (SNode _ l r _) = setHeight l - setHeight r
 
-rotateRight :: Set a -> Set a
-rotateRight (SNode y (SNode x l lx h2) r h1) = setUpdateHeight $ SNode x l (setUpdateHeight (SNode y lx r undefined)) undefined
-rotateRight s = s
+setRotateRight :: Set a -> Set a
+setRotateRight (SNode y (SNode x l lx h2) r h1) = setUpdateHeight $ SNode x l (setUpdateHeight (SNode y lx r undefined)) undefined
+setRotateRight s = s
 
-rotateLeft :: Set a -> Set a
-rotateLeft (SNode x l (SNode y rx r h2) h1) = setUpdateHeight $ SNode y (setUpdateHeight (SNode x l rx undefined)) r undefined
-rotateLeft s = s
+setRotateLeft :: Set a -> Set a
+setRotateLeft (SNode x l (SNode y rx r h2) h1) = setUpdateHeight $ SNode y (setUpdateHeight (SNode x l rx undefined)) r undefined
+setRotateLeft s = s
 
-balance :: Set a -> Set a
-balance (SNode val l r h)
-  | bf > 1 && setBalanceFactor l >= 0 = rotateRight (SNode val l r h)
-  | bf > 1 = rotateRight (SNode val (rotateLeft l) r h)
-  | bf < -1 && setBalanceFactor r <= 0 = rotateLeft (SNode val l r h)
-  | bf < -1 = rotateLeft (SNode val l (rotateRight r) h)
+setBalance :: Set a -> Set a
+setBalance (SNode val l r h)
+  | bf > 1 && setBalanceFactor l >= 0 = setRotateRight (SNode val l r h)
+  | bf > 1 = setRotateRight (SNode val (setRotateLeft l) r h)
+  | bf < -1 && setBalanceFactor r <= 0 = setRotateLeft (SNode val l r h)
+  | bf < -1 = setRotateLeft (SNode val l (setRotateRight r) h)
   | otherwise = setUpdateHeight (SNode val l r h)
   where
     bf = setBalanceFactor (SNode val l r h)
-balance s = s
+setBalance s = s
 
-insertSet :: (Ord a) => Set a -> a -> Set a
-insertSet SEmpty newVal = SNode newVal SEmpty SEmpty 1
-insertSet (SNode val l r h) newVal
-  | val > newVal = balance (SNode val (insertSet l newVal) r h)
-  | val < newVal = balance (SNode val l (insertSet r newVal) h)
+setInsert :: (Ord a) => Set a -> a -> Set a
+setInsert SEmpty newVal = SNode newVal SEmpty SEmpty 1
+setInsert (SNode val l r h) newVal
+  | val > newVal = setBalance (SNode val (setInsert l newVal) r h)
+  | val < newVal = setBalance (SNode val l (setInsert r newVal) h)
   | otherwise = SNode newVal l r h
 
-containsSet :: (Ord a) => Set a -> a -> Bool
-containsSet SEmpty _ = False
-containsSet (SNode val l r h) target
-  | val > target = containsSet l target
-  | val < target = containsSet r target
+setContains :: (Ord a) => Set a -> a -> Bool
+setContains SEmpty _ = False
+setContains (SNode val l r h) target
+  | val > target = setContains l target
+  | val < target = setContains r target
   | otherwise = True
 
 searchSet :: (Ord a) => Set a -> a -> Set a
@@ -175,7 +206,7 @@ data MEntry k v = MEntry k v
 
 instance (Eq k) => Eq (MEntry k v) where
   (MEntry k1 _) == (MEntry k2 _) = k1 == k2
-
+  
 instance (Ord k) => Ord (MEntry k v) where
   (MEntry k1 _) `compare` (MEntry k2 _) = k1 `compare` k2
 
@@ -185,21 +216,21 @@ newtype (Ord k) => Map k v = Map (Set (MEntry k v))
 emptyMap :: (Ord k) => Map k v
 emptyMap = Map emptySet
 
-insertMap :: (Ord k) => Map k v -> k -> v -> Map k v
-insertMap (Map s) key value = Map (insertSet s (MEntry key value))
+mapInsert :: (Ord k) => Map k v -> k -> v -> Map k v
+mapInsert (Map s) key value = Map (setInsert s (MEntry key value))
 
-lookupMap :: (Ord k) => Map k v -> k -> Maybe v
-lookupMap (Map s) key =
+mapLookup :: (Ord k) => Map k v -> k -> Maybe v
+mapLookup (Map s) key =
   case searchSet s (MEntry key undefined) of
     SEmpty                   -> Nothing
     SNode (MEntry _ v) _ _ _ -> Just v
 
-sizeMap :: (Ord k) => Map k v -> Int
-sizeMap (Map s) = setSize s
+mapSize :: (Ord k) => Map k v -> Int
+mapSize (Map s) = setSize s
 
 mapFromList :: (Ord k) => [(k, v)] -> Map k v
 mapFromList []                     = emptyMap
-mapFromList ((key, val) : subList) = insertMap (mapFromList subList) key val
+mapFromList ((key, val) : subList) = mapInsert (mapFromList subList) key val
 
 mapToList :: (Ord k) => Map k v -> [(k, v)]
 mapToList (Map SEmpty) = []
@@ -213,64 +244,32 @@ data (Ord a) => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
 emptyHeap :: Heap a
 emptyHeap = HEmpty
 
-heapSize :: (Ord a) => Heap a -> Int
-heapSize HEmpty             = 0
-heapSize (HNode _ size _ _) = size
+heapRank :: (Ord a) => Heap a -> Int
+heapRank HEmpty          = 0
+heapRank (HNode _ r _ _) = r
 
 heapMin :: (Ord a) => Heap a -> a
+heapMin HEmpty            = error "Cannot pop empty heap"
 heapMin (HNode min _ _ _) = min
 
-addLast :: (Ord a) => Heap a -> a -> Heap a
-addLast HEmpty x = HNode x 1 HEmpty HEmpty
-addLast (HNode y size left right) x
-  | heapSize left <= heapSize right = HNode y (size + 1) (addLast left x) right
-  | otherwise = HNode y (size + 1) left (addLast right x)
+heapBuild :: (Ord a) => a -> Heap a -> Heap a -> Heap a
+heapBuild x h1 h2
+  | heapRank h1 >= heapRank h2 = HNode x (heapRank h2 + 1) h1 h2
+  | otherwise = HNode x (heapRank h1 + 1) h2 h1 
 
-heapifyUp :: (Ord a) => Heap a -> Heap a
-heapifyUp HEmpty = HEmpty
-heapifyUp (HNode x size left right)
-  | heapSize left > heapSize right =
-      let newLeft = heapifyUp left
-       in case heapifyUp left of
-            (HNode y size' left' right') ->
-              if y < x
-                then HNode y size (HNode x size' left' right') right
-                else HNode x size newLeft right
-            _ -> HNode x size newLeft right
-  | otherwise =
-      let newRight = heapifyUp right
-       in case heapifyUp right of
-            (HNode y size' left' right') ->
-              if y < x
-                then HNode y size left (HNode x size' left' right')
-                else HNode x size left newRight
-            _ -> HNode x size left newRight
-
+heapMerge :: (Ord a) => Heap a -> Heap a -> Heap a
+heapMerge h HEmpty = h
+heapMerge HEmpty h = h
+heapMerge h1@(HNode x _ l1 r1) h2@(HNode y _ l2 r2)
+  | x <= y = heapBuild x l1 (heapMerge r1 h2)
+  | otherwise = heapBuild y l2 (heapMerge h1 r2)
+  
 heapInsert :: (Ord a) => Heap a -> a -> Heap a
-heapInsert heap x = heapifyUp $ addLast heap x
-
-removeLast :: (Ord a) => Heap a -> (a, Heap a)
-removeLast (HNode x _ HEmpty HEmpty) = (x, HEmpty)
-removeLast (HNode x size left right)
-  | heapSize left > heapSize right = let (lastVal, newLeft) = removeLast left in (lastVal, HNode x (size - 1) newLeft right)
-  | otherwise = let (lastVal, newRight) = removeLast right in (lastVal, HNode x (size - 1) left newRight)
-
-heapifyDown :: (Ord a) => Heap a -> Heap a
-heapifyDown (HNode x size left@(HNode y size' left' right') right@(HNode z size'' left'' right''))
-  | y < x && y < z = HNode y size (heapifyDown $ HNode x size' left' right') right
-  | z < x = HNode z size left (heapifyDown $ HNode x size'' left'' right'')
-heapifyDown (HNode x size (HNode y size' left' right') HEmpty)
-  | y < x = HNode y size (heapifyDown $ HNode x size' left' right') HEmpty
-heapifyDown (HNode x size HEmpty (HNode y size' left' right'))
-  | y < x = HNode y size HEmpty (heapifyDown $ HNode x size' left' right')
-heapifyDown heap = heap
+heapInsert heap x = heapMerge (HNode x 1 HEmpty HEmpty) heap
 
 heapPopMin :: (Ord a) => Heap a -> (a, Heap a)
-heapPopMin heap =
-  let (lastVal, newTree) = removeLast heap
-   in case newTree of
-        (HNode x size left right) -> (x, heapifyDown (HNode lastVal size left right))
-        HEmpty -> (lastVal, HEmpty)
+heapPopMin HEmpty = error "Cannot pop empty heap"
+heapPopMin (HNode x _ r l) = (x, heapMerge r l)
 
 heapIsEmpty :: (Ord a) => Heap a -> Bool
 heapIsEmpty HEmpty = True
@@ -338,6 +337,11 @@ cities :: RoadMap -> [City]
 cities [] = []
 cities r = sortUnique $ citySelect r
   where
+    -- | Retrieves a list that, for each edge, contains both the start and end cities.
+    --   Arguments:
+    --     * Roadmap: representation of the graph.
+    --   Returns:
+    --     * [City]: All cities taken from the start or end of the edges in the roadmap.
     citySelect :: RoadMap -> [City]
     citySelect []               = []
     citySelect ((a, b, _) : xs) = a : b : citySelect xs
@@ -357,6 +361,11 @@ cities r = sortUnique $ citySelect r
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent roadMap city1 city2 = any connectsCities roadMap
   where
+    -- | Checks if there an edge connects the two given cities (in either direction).
+    --   Arguments:
+    --     * (City, City, Distance): edge of the roadmap.
+    --   Returns:
+    --     * Bool: True if the edge connects them, False otherwise.
     connectsCities :: (City, City, Distance) -> Bool
     connectsCities (orig, dest, _) = (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)
 
@@ -375,6 +384,7 @@ areAdjacent roadMap city1 city2 = any connectsCities roadMap
 distance :: RoadMap -> City -> City -> Maybe Distance
 distance roadMap city1 city2 = if null match then Nothing else Just (head match)
   where
+    -- | List of the distances of edges between the given cities (presumably, between length is either 0 or 1)
     match :: [Distance]
     match = [dist | (orig, dest, dist) <- roadMap, (orig, dest) == (city1, city2) || (dest, orig) == (city1, city2)]
 
@@ -407,15 +417,20 @@ pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
 pathDistance roadMap path = getPathDistance sortedPairs sortedEdges
   where
-    consecutivePairs :: [(City, City)]
-    consecutivePairs = zip path $ tail path
-
+    -- | All pairs of two consecutive cities in the path, sorted.
     sortedPairs :: [(City, City)]
-    sortedPairs = Data.List.sort consecutivePairs
+    sortedPairs = Data.List.sort (zip path $ tail path)
 
+    -- | All edges and reverse edges of the roadmap, sorted.
     sortedEdges :: [(City, City, Distance)]
     sortedEdges = Data.List.sort $ roadMap ++ reverseGraph roadMap
 
+    -- | Computes the distance of a path with ordered pairs and edges.
+    --   Arguments:
+    --     * [(City, City)]: Pairs of cities in the path, sorted.
+    --     * [(City, City, Distance)]: All edges of the graph, sorted.
+    --   Returns:
+    --     * Maybe Distance: Just sum of distances if all edges in the path exist, Nothing otherwise.
     getPathDistance :: [(City, City)] -> [(City, City, Distance)] -> Maybe Distance
     getPathDistance [] _ = Just 0
     getPathDistance _ [] = Nothing
@@ -438,13 +453,15 @@ pathDistance roadMap path = getPathDistance sortedPairs sortedEdges
 rome :: RoadMap -> [City]
 rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
   where
+    -- | Adjacency list representation of the roadmap.
     adjList :: AdjList
     adjList = toAdjList roadMap
 
+    -- | Pair containing each city andd its degree
     degrees :: [(City, Int)]
     degrees = [(city, length adj) | (city, adj) <- adjList]
 
-    maxDegree :: Int
+    -- | Highest degree across all cities i.
     maxDegree = maximum $ map snd degrees
 
 -- | Returns whether all the cities in the roadmap are connected.
@@ -458,36 +475,55 @@ rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
 --   Returns:
 --     * Bool: True if the graph is strongly connected, False otherwise.
 isStronglyConnected :: RoadMap -> Bool
-isStronglyConnected roadMap = and $ [containsSet visitedSet city | city <- cities roadMap]
+isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- cities roadMap]
   where
+    -- | Adjacency list representation of the roadmap.
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
-
+    
+    -- | Starting city for the DFS search.
     root :: City
     root = orig $ head roadMap
       where
+        -- | Unpacks the origin city in the edge of the roadmap.
+        --   Arguments:
+        --     * (City, City, Distance): Edge of the roadmap.
+        --   Returns:
+        --     * City: First value in the edge triplet (origin city).
         orig :: (City, City, Distance) -> City
         orig (city, _, _) = city
 
+    -- | Set of all visited cities after the DFS.
     visitedSet :: Set City
     visitedSet = dfs root
 
+    -- | Returns whether all the cities in the roadmap are connected.
+    --
+    --   Efficiency:
+    --     * Time Complexity: O(E log E)
+    --
+    --   Arguments:
+    --     * City: starting city of the Depth First Search.
+    --
+    --   Returns:
+    --     * Set City: set of visited cities by the end of the DFS.
     dfs :: City -> Set City
     dfs root = dfsVisit visitedSet root
       where
+        -- | Set of all visited cities after the DFS.
         visitedSet :: Set City
         visitedSet = emptySet
 
         dfsVisit :: Set City -> City -> Set City
-        dfsVisit visitedSet root = getNextVisitedSet (insertSet visitedSet root) adjs
+        dfsVisit visitedSet root = getNextVisitedSet (setInsert visitedSet root) adjs
           where
             adjs :: [City]
-            adjs = map fst (unjust $ lookupMap adjMap root)
+            adjs = map fst (unjust $ mapLookup adjMap root)
 
             getNextVisitedSet :: Set City -> [City] -> Set City
             getNextVisitedSet visitedSet [] = visitedSet
             getNextVisitedSet visitedSet (adj : adjs)
-              | containsSet visitedSet adj = getNextVisitedSet visitedSet adjs
+              | setContains visitedSet adj = getNextVisitedSet visitedSet adjs
               | otherwise = getNextVisitedSet (dfsVisit visitedSet adj) adjs
 
 -- | Returns all the shortest paths that connect two cities in a roadmap.
@@ -503,7 +539,7 @@ isStronglyConnected roadMap = and $ [containsSet visitedSet city | city <- citie
 --   Returns:
 --     * [Path]: All single pair shortest paths of the given cities in a specific roadmap.
 shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath roadMap orig dest = case lookupMap pathMap dest of
+shortestPath roadMap orig dest = case mapLookup pathMap dest of
   (Just (_, paths)) -> map reverse paths
   Nothing           -> []
   where
@@ -520,18 +556,18 @@ shortestPath roadMap orig dest = case lookupMap pathMap dest of
         restHeap :: Heap DijkstraState
         ((newDist, city, paths), restHeap) = heapPopMin heap
 
-        (newMap, newHeap) = case lookupMap predMap city of
+        (newMap, newHeap) = case mapLookup predMap city of
           Just (oldDist, oldPaths) ->
             if newDist == oldDist
-              then (insertMap predMap city (newDist, paths ++ oldPaths), restHeap)
+              then (mapInsert predMap city (newDist, paths ++ oldPaths), restHeap)
               else (predMap, restHeap)
-          Nothing -> (insertMap predMap city (newDist, paths), updatedHeap)
+          Nothing -> (mapInsert predMap city (newDist, paths), updatedHeap)
 
         updatedHeap :: Heap DijkstraState
         updatedHeap = foldl insertState restHeap adjs
           where
             adjs :: [(City, Distance)]
-            adjs = unjust $ lookupMap adjMap city
+            adjs = unjust $ mapLookup adjMap city
 
             insertState :: Heap DijkstraState -> (City, Distance) -> Heap DijkstraState
             insertState heap (neighbor, dist) = heapInsert heap (newDist + dist, neighbor, map (neighbor :) paths)
@@ -562,7 +598,7 @@ travelSales roadMap = case heldKarp adjMatrix of
     cityMap = mapFromList $ map (\(x, y) -> (y, x)) (mapToList indexMap)
 
     getCity :: Int -> City
-    getCity index = unjust $ lookupMap cityMap index
+    getCity index = unjust $ mapLookup cityMap index
 
     heldKarp :: AdjMatrix -> TspEntry
     heldKarp adjMatrix = dp Data.Array.! (start, fullBitmask (numCities - 1))
@@ -609,3 +645,6 @@ gTest2 = [("0", "1", 10), ("0", "2", 15), ("0", "3", 20), ("1", "2", 35), ("1", 
 
 gTest3 :: RoadMap -- unconnected graph
 gTest3 = [("0", "1", 4), ("2", "3", 2)]
+
+gTestN :: Int -> RoadMap
+gTestN n = [(show orig, show dest, 1) | orig <- [1..n], dest <- [orig + 1..n]]
