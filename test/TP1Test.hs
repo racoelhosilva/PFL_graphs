@@ -154,23 +154,30 @@ prop_mapIsOrdered kvs = isOrdered res
     res :: [(Int, Int)]
     res = mapToList $ mapFromList kvs
 
-prop_heapIsBalanced :: [Int] -> Bool
-prop_heapIsBalanced xs = isBalanced $ foldl heapInsert emptyHeap xs
-  where
-    isBalanced :: Ord a => Heap a -> Bool
-    isBalanced HEmpty = True
-    isBalanced (HNode _ _ left right) = abs (heapRank left - heapRank right) <= 1
-      && isBalanced left && isBalanced right
-
 prop_heapIsOrdered :: [Int] -> Bool
 prop_heapIsOrdered xs = isOrdered $ foldl heapInsert emptyHeap xs
   where
     isOrdered :: Ord a => Heap a -> Bool
     isOrdered HEmpty = True
     isOrdered (HNode _ _ HEmpty HEmpty) = True
-    isOrdered (HNode x _ left@(HNode y _ _ _) HEmpty) = x < y && isOrdered left
-    isOrdered (HNode x _ HEmpty right@(HNode y _ _ _)) = x < y && isOrdered right
-    isOrdered (HNode x _ left@(HNode y _ _ _) right@(HNode z _ _ _)) = x < y && x < z && isOrdered left && isOrdered right
+    isOrdered (HNode x _ left@(HNode y _ _ _) HEmpty) = x <= y && isOrdered left
+    isOrdered (HNode x _ HEmpty right@(HNode y _ _ _)) = x <= y && isOrdered right
+    isOrdered (HNode x _ left@(HNode y _ _ _) right@(HNode z _ _ _)) = x <= y && x <= z && isOrdered left && isOrdered right
+
+prop_heapIsLeftist :: [Int] -> Bool
+prop_heapIsLeftist xs = isLeftist $ foldl heapInsert emptyHeap xs
+  where
+    isLeftist :: Ord a => Heap a -> Bool
+    isLeftist HEmpty = True
+    isLeftist (HNode _ _ left right) = heapRank left >= heapRank right && isLeftist left && isLeftist right
+
+prop_heapRankMatchesRight :: [Int] -> Bool
+prop_heapRankMatchesRight xs = let heap = foldl heapInsert emptyHeap xs
+  in getRightDistance heap == heapRank heap
+  where
+    getRightDistance :: (Ord a) => Heap a -> Int
+    getRightDistance HEmpty = 0
+    getRightDistance (HNode _ _ _ r) = 1 + getRightDistance r
 
 prop_heapInsertNotEmpty :: [Int] -> Int -> Bool
 prop_heapInsertNotEmpty xs x = not $ heapIsEmpty $ heapInsert (foldl heapInsert emptyHeap xs) x
@@ -180,16 +187,6 @@ prop_heapMinIsExtracted (NonEmpty xs) = let
   heap = foldl heapInsert emptyHeap xs
   min = heapMin heap
   in min == fst (heapPopMin heap) && min == minimum xs
-
-prop_heapBalancedAfterExtraction :: NonEmptyList Int -> Property
-prop_heapBalancedAfterExtraction (NonEmpty xs) =
-  forAll (choose (0, length xs)) $ \extractions ->
-    isBalanced $ iterate (snd . heapPopMin) (foldl heapInsert emptyHeap xs) !! extractions
-      where
-        isBalanced :: Ord a => Heap a -> Bool
-        isBalanced HEmpty = True
-        isBalanced (HNode _ _ left right) = abs (heapRank left - heapRank right) <= 1
-          && isBalanced left && isBalanced right
 
 
 prop_citiesWithoutDuplicates :: GoodRoadMap -> Bool
@@ -315,20 +312,20 @@ main = hspec $ do
 
   describe "Heap" $ do
     describe "insert" $ do
-      prop "Heap is balanced"
-        prop_heapIsBalanced
-
       prop "Heap is ordered"
-        prop_setIsOrdered
+        prop_heapIsOrdered
+
+      prop "Heap is a leftist tree"
+        prop_heapIsLeftist
+
+      prop "Heap rank matches path to empty node to the right"
+        prop_heapRankMatchesRight
 
       prop "Heap not empty after insert"
         prop_heapInsertNotEmpty
 
       prop "Heap min is extracted"
         prop_heapMinIsExtracted
-
-      prop "Heap balanced after extraction"
-        prop_heapBalancedAfterExtraction
 
 -- Tests for Functions
 
