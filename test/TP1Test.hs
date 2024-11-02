@@ -258,8 +258,8 @@ rotate xs n = let (xs1, xs2) = splitAt n (reverse xs)
   in reverse xs1 ++ reverse xs2
 
 sameCircuit :: [City] -> [City] -> Bool
-sameCircuit (x:xs) (y:ys) = case elemIndex x ys of
-  Just n  -> rotate xs n == ys || rotate xs (length xs - n) == reverse ys
+sameCircuit (x:xs) (y:ys) = case elemIndex x (y:ys) of
+  Just n  -> rotate xs n == ys || rotate xs (length xs + 1 - n) == reverse ys
   Nothing -> False
 
 -- Main
