@@ -885,11 +885,12 @@ rome roadMap = map fst (filter (\(city, degree) -> degree == maxDegree) degrees)
     adjList :: AdjList
     adjList = toAdjList roadMap
 
-    -- | Pair containing each city andd its degree
+    -- | Pair containing each city and its degree
     degrees :: [(City, Int)]
     degrees = [(city, length adj) | (city, adj) <- adjList]
 
-    -- | Highest degree across all cities i.
+    -- | Highest degree across all cities in the graph.
+    maxDegree :: Int
     maxDegree = maximum $ map snd degrees
 
 -- | Returns whether all the cities in the roadmap are connected.
