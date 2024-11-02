@@ -425,7 +425,7 @@ main = hspec $ do
       shortestPath gTest3 "0" "1" `shouldBe` [["0", "1"]]
 
     it "Calculates multiple shortest paths" $ do
-      shortestPath gTest1 "7" "8" `shouldBe` [["7", "8"], ["7", "6", "8"]]
+      sort (shortestPath gTest1 "7" "8") `shouldBe` [["7", "6", "8"], ["7", "8"]]
 
     it "Checks if no path exists" $ do
       shortestPath gTest3 "0" "2" `shouldBe` []

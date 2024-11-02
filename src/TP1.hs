@@ -17,9 +17,7 @@ type Distance = Int
 type RoadMap = [(City, City, Distance)]
 
 type AdjList = [(City, [(City, Distance)])]
-
 type AdjMap = Map City [(City, Distance)]
-
 type AdjMatrix = Data.Array.Array (Int,Int) (Maybe Distance)
 
 -- Bitmask
@@ -390,23 +388,23 @@ isStronglyConnected roadMap = and $ [containsSet visitedSet city | city <- citie
 
 -- shortestPath
 
-type DijkstraState = (Distance, City, City)
-type Predecessors = (Distance, [City])
+type DijkstraState = (Distance, City, [Path])
+type Predecessors = (Distance, [Path])
 
-dijkstra :: AdjMap -> Map City Predecessors -> Heap DijkstraState -> (Map City Predecessors, Heap DijkstraState)
-dijkstra adjMap map heap
-  | heapIsEmpty heap = (map, heap)
+dijkstra :: AdjMap -> Map City Predecessors -> Heap DijkstraState -> Map City Predecessors
+dijkstra adjMap predMap heap
+  | heapIsEmpty heap = predMap
   | otherwise        = dijkstra adjMap newMap newHeap
 
   where
     restHeap :: Heap DijkstraState
-    ((newDist, city, pred), restHeap) = heapPopMin heap
+    ((newDist, city, paths), restHeap) = heapPopMin heap
 
-    (newMap, newHeap) = case lookupMap map city of
-      Just (oldDist,preds) -> if newDist == oldDist
-        then (insertMap map city (newDist, pred : preds), restHeap)
-        else (map, restHeap)
-      Nothing        -> (insertMap map city (newDist, [pred]), updatedHeap)
+    (newMap, newHeap) = case lookupMap predMap city of
+      Just (oldDist,oldPaths) -> if newDist == oldDist
+        then (insertMap predMap city (newDist, paths ++ oldPaths), restHeap)
+        else (predMap, restHeap)
+      Nothing                 -> (insertMap predMap city (newDist, paths), updatedHeap)
 
     updatedHeap :: Heap DijkstraState
     updatedHeap = foldl insertState restHeap adjs
@@ -415,22 +413,17 @@ dijkstra adjMap map heap
         adjs = unjust $ lookupMap adjMap city
 
         insertState :: Heap DijkstraState -> (City, Distance) -> Heap DijkstraState
-        insertState heap (neighbor, dist) = heapInsert heap (newDist + dist, neighbor, city)
-
-reconstruct :: Map City Predecessors -> City -> City -> [Path]
-reconstruct predMap orig city
-  | city == orig = [[orig]]
-  | otherwise    = case lookupMap predMap city of
-    Just (_,preds) -> map (city :) $ concat [reconstruct predMap orig pred | pred <- preds]
-    Nothing        -> []
+        insertState heap (neighbor, dist) = heapInsert heap (newDist + dist, neighbor, map (neighbor :) paths)
 
 shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath roadMap orig dest = map reverse $ reconstruct predMap orig dest
+shortestPath roadMap orig dest = case lookupMap pathMap dest of
+  (Just (_,paths)) -> map reverse paths
+  Nothing          -> []
   where
     adjMap :: AdjMap
     adjMap = toAdjMap roadMap
 
-    (predMap, heap) = dijkstra adjMap emptyMap (heapInsert emptyHeap (0, orig, undefined))
+    pathMap = dijkstra adjMap emptyMap (heapInsert emptyHeap (0, orig, [[orig]]))
 
 -- travelSales
 
