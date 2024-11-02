@@ -116,7 +116,7 @@ prop_setInsertionCommutativity xs y z = let set = foldl insertSet emptySet xs
   in setToList (insertSet (insertSet set y) z) == setToList (insertSet (insertSet set z) y)
 
 prop_setIsBalanced :: [Int] -> Bool
-prop_setIsBalanced xs = abs (balanceFactor $ foldl insertSet emptySet xs) <= 1
+prop_setIsBalanced xs = abs (setBalanceFactor $ foldl insertSet emptySet xs) <= 1
 
 prop_setIsOrdered :: [Int] -> Bool
 prop_setIsOrdered xs = isOrdered res
@@ -252,7 +252,7 @@ prop_travelSalesPassesEachCityOnce :: GoodRoadMap -> Property
 prop_travelSalesPassesEachCityOnce (GoodRoadMap roadMap) = let
   circuit = travelSales roadMap
   mapCities = cities roadMap
-  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUniq (nub circuit) == sortUniq mapCities
+  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUnique (nub circuit) == sortUnique mapCities
 
 -- Auxiliary Functions 
 
