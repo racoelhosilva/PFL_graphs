@@ -266,7 +266,7 @@ setRotateRight s = s
 --   Returns:
 --     * Set a: resulting set after the rotation.
 setRotateLeft :: (Ord a) => Set a -> Set a
-setRotateLeft (SNode x h1 l (SNode y h2 rx r)) = setUpdateHeight $ SNode y undefined (setUpdateHeight (SNode x undefined l rx)) r 
+setRotateLeft (SNode x h1 l (SNode y h2 rx r)) = setUpdateHeight $ SNode y undefined (setUpdateHeight (SNode x undefined l rx)) r
 setRotateLeft s = s
 
 -- | Balances the current set based on left and right rotations.
@@ -829,7 +829,9 @@ areAdjacent roadMap city1 city2 = any connectsCities roadMap
 --   Returns:
 --     * Maybe Distance: Just distance, if there is an edge between them, Nothing otherwise.
 distance :: RoadMap -> City -> City -> Maybe Distance
-distance roadMap city1 city2 = if null matches then Nothing else Just (head matches)
+distance roadMap city1 city2 = case matches of
+  (dist : _) -> Just dist
+  _          -> Nothing
   where
     -- | List of the distances of edges between the given cities (presumably, between length is either 0 or 1)
     matches :: [Distance]
@@ -868,11 +870,11 @@ adjacent roadMap city = [(dest, dist) | (orig, dest, dist) <- roadMap, orig == c
 --     * Maybe Distance: Just the sum of the edge distance in the path, Nothing if any two consecutive cities are not connected.
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance _ [] = Nothing
-pathDistance roadMap path = getPathDistance sortedPairs sortedEdges
+pathDistance roadMap path@(_ : pathTail) = getPathDistance sortedPairs sortedEdges
   where
     -- | All pairs of two consecutive cities in the path, sorted.
     sortedPairs :: [(City, City)]
-    sortedPairs = Data.List.sort (zip path $ tail path)
+    sortedPairs = Data.List.sort $ zip path pathTail
 
     -- | All edges and reverse edges of the roadmap, sorted.
     sortedEdges :: [(City, City, Distance)]
@@ -931,7 +933,8 @@ rome roadMap = map fst (filter (\(_, degree) -> degree == maxDegree) degrees)
 --   Returns:
 --     * Bool: True if the graph is strongly connected, False otherwise.
 isStronglyConnected :: RoadMap -> Bool
-isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- cities roadMap]
+isStronglyConnected [] = False
+isStronglyConnected roadMap@(firstEdge : _) = and $ [setContains visitedSet city | city <- cities roadMap]
   where
     -- | Adjacency map representation of the roadmap.
     adjMap :: AdjMap
@@ -939,7 +942,7 @@ isStronglyConnected roadMap = and $ [setContains visitedSet city | city <- citie
 
     -- | Starting city for the DFS search.
     root :: City
-    root = orig $ head roadMap
+    root = orig firstEdge
       where
         -- | Unpacks the origin city in the edge of the roadmap.
         --   Arguments:
