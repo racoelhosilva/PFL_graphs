@@ -24,13 +24,11 @@
 
 ### Dijkstra's algorithm: `shortestPath`
 
-<!-- Explanation of how the shortestPath function was implemented, including a justification of why certain auxiliary data structures were selected and used, and a description of the algorithm(s) used. -->
-
 The `shortestPath` function computes all possible shortest paths between a start and end city in the roadmap. The solution that we used for this problem, also known as "Single Pair Shortest Paths", was based on the Dijkstra's algorithm.
 
-The main idea of this algorithm is to start with a root node and sequentially explore the smallest discovered edge that is connected to an unvisited node. By doing this, we will explore all the shortest paths connecting the initial node to the other nodes.
+The main idea of this algorithm is to start with a root node and sequentially explore the smallest known edge that is connected to an unvisited node. By doing this, we will explore all the shortest paths connecting the initial node to the other nodes.
 
-Additionally, if we for each node we keep track not only of the smallest distance to reach it but also of the path that was used to reach it, when the algorithm finishes (which is when all the nodes have been visited or there are no more edges to explore) we will have for each node, the smallest distance between the starting node and any node, as well as the paths that can be used to reach it.
+Additionally, if for each node we keep track not only of the smallest distance to reach it but also of the path that was used to reach it, when the algorithm finishes (which is when all the nodes have been visited or there are no more edges to explore) we will have for each node the smallest distance between the starting node and that specific node, as well as the paths that can be used to reach it.
 
 At this point, by retrieving this information for the end node which we were trying to reach, we will have all the shortest paths that connect the starting node to the end node (if there are any).
 
@@ -38,12 +36,12 @@ In order to implement this algorithm, we used:
 - **Adjacency Map** to represent the graph. For each node, we have an associated map whose keys are the adjacent cities and values are the distances of the respective edges. This allows us to retrieve the distance between a specific pair of edges in logarithmic time, due to the way the map was implemented (based on an AVL Tree data structure).
 - **Map** to store the distance and paths of the shortest path between the start and each city. This allowed us to retrieve lookup the information of the shortest path for each city, during the algorithm, in logarithmic time complexity. This complexity is due to the way the map is implemented based on an AVL Tree set structure where the values are key-value entries comparable only by the key.
 - **Min Heap** to repeatedly retrieve the smallest edge that connects to an unvisited edge. This data structure allowed us to insert and pop the smallest element stored in logarithmic time complexity, improving the overall performance of the algorithm. 
+  
+One final note is that due to the way Dijkstra's algorithm works, it will not return the correct results in case the graph contains negative edges or negative cycles. This is not due to our implementation, but rather due to the algorithm itself. For this project, since we are working with cities and roadmaps, we believe it is safe to assume all distances between cities are positive.
 
 ### Held-Karp's algorithm: `travelSales`
 
-<!-- TODO: Add description -->
-
-For solving the Traveling Salesperson Problem, we used a dynamic programming approach, based on the Held-Karp algorithm.
+The `travelSales` functions aims to calculate the shortest hamiltonian circuit in a graph, that is, the shortest path that goes through all of the vertices only once and returns to the start. This problem is known as the Traveling Salesperson Problem (TSP) and to solve it efficiently, we used a dynamic programming approach, based on the Held-Karp algorithm.
 
 This algorithm is based on the observation that the shortest path that goes through a set of vertices follows optimal substructure, i.e. the shortest path that goes from the origin `u` to a vertex `v`, through the vertices in a set `S` in some order (such that `u` and `v` are not in `S`), contains the shortest path that starts in `u` and passes through all the vertices in `S`. This way, we can solve the TSP by solving the following recurrence:
 

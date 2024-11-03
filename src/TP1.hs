@@ -1055,7 +1055,7 @@ shortestPath roadMap orig dest = case mapLookup pathMap dest of
 --     * Roadmap: representation of the graph.
 --
 --   Returns:
---     * Path: Shortest hamiltonian cycle in the graph (shortest path that goes through all vertices and returns to the start).
+--     * Path: Shortest hamiltonian cycle in the graph (shortest path that goes through all vertices only once and returns to the start).
 travelSales :: RoadMap -> Path
 travelSales [] = []
 travelSales roadMap = case dp Data.Array.! (start, clearBit (fullBitmask numCities) start) of
