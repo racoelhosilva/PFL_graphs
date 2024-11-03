@@ -99,7 +99,8 @@ instance Arbitrary GoodRoadMap where
     rawMap <- listOf (arbitrary :: Gen GoodEdge)
     return $ GoodRoadMap $ removeDuplicateEdges $ map coerce rawMap
 
-  shrink (GoodRoadMap roadMap) = [GoodRoadMap $ removeDuplicateEdges $ map coerce edges | edges <- shrink $ map GoodEdge roadMap]
+  shrink (GoodRoadMap roadMap) = [GoodRoadMap $ removeDuplicateEdges $ 
+    map coerce edges | edges <- shrink $ map GoodEdge roadMap]
 
 {- ... -}
 
@@ -111,7 +112,8 @@ prop_travelSalesPassesEachCityOnce :: GoodRoadMap -> Property
 prop_travelSalesPassesEachCityOnce (GoodRoadMap roadMap) = let
   circuit = travelSales roadMap
   mapCities = cities roadMap
-  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUnique circuit == mapCities
+  in not (null circuit) ==> length circuit == length mapCities + 1 && 
+    sortUnique circuit == mapCities
 
 {- ... -}
 
@@ -120,8 +122,10 @@ main = hspec $ do
 
   describe "travelSales" $ do
     it "Determines correct circuit" $ do
-      travelSales gTest1 `shouldSatisfy` sameCircuit ["0", "1", "2", "3", "4", "5", "6", "8", "7", "0"]
-      travelSales gTest2 `shouldSatisfy` sameCircuit ["0", "1", "3", "2", "0"]
+      travelSales gTest1 `shouldSatisfy` sameCircuit 
+        ["0", "1", "2", "3", "4", "5", "6", "8", "7", "0"]
+      travelSales gTest2 `shouldSatisfy` sameCircuit 
+        ["0", "1", "3", "2", "0"]
 
     it "Checks if no hamiltonian circuit exists" $ do
       travelSales gTest3 `shouldBe` []
