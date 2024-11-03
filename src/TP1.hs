@@ -211,7 +211,7 @@ data Set a = SEmpty | SNode a Int (Set a) (Set a)
   deriving (Show, Eq)
 
 -- | Returns an empty set.
-emptySet :: Set a
+emptySet :: (Ord a) => Set a
 emptySet = SEmpty
 
 -- | Returns the height of a set.
@@ -221,7 +221,7 @@ emptySet = SEmpty
 --
 --   Returns:
 --     * Int: height of the set.
-setHeight :: Set a -> Int
+setHeight :: (Ord a) => Set a -> Int
 setHeight SEmpty          = 0
 setHeight (SNode _ h _ _) = h
 
@@ -232,7 +232,7 @@ setHeight (SNode _ h _ _) = h
 --
 --   Returns:
 --     * Set a: resulting set with the recalculated height.
-setUpdateHeight :: Set a -> Set a
+setUpdateHeight :: (Ord a) => Set a -> Set a
 setUpdateHeight SEmpty = SEmpty
 setUpdateHeight (SNode v _ l r) = SNode v (1 + max (setHeight l) (setHeight r)) l r
 
@@ -243,7 +243,7 @@ setUpdateHeight (SNode v _ l r) = SNode v (1 + max (setHeight l) (setHeight r)) 
 --
 --   Returns:
 --     * Int: Balance factor between the left and right children.
-setBalanceFactor :: Set a -> Int
+setBalanceFactor :: (Ord a) => Set a -> Int
 setBalanceFactor SEmpty          = 0
 setBalanceFactor (SNode _ _ l r) = setHeight l - setHeight r
 
@@ -254,7 +254,7 @@ setBalanceFactor (SNode _ _ l r) = setHeight l - setHeight r
 --
 --   Returns:
 --     * Set a: resulting set after the rotation.
-setRotateRight :: Set a -> Set a
+setRotateRight :: (Ord a) => Set a -> Set a
 setRotateRight (SNode y h1 (SNode x h2 l lx) r) = setUpdateHeight $ SNode x undefined l (setUpdateHeight (SNode y undefined lx r))
 setRotateRight s = s
 
@@ -265,7 +265,7 @@ setRotateRight s = s
 --
 --   Returns:
 --     * Set a: resulting set after the rotation.
-setRotateLeft :: Set a -> Set a
+setRotateLeft :: (Ord a) => Set a -> Set a
 setRotateLeft (SNode x h1 l (SNode y h2 rx r)) = setUpdateHeight $ SNode y undefined (setUpdateHeight (SNode x undefined l rx)) r 
 setRotateLeft s = s
 
@@ -276,7 +276,7 @@ setRotateLeft s = s
 --
 --   Returns:
 --     * Set a: resulting set after the balance operation.
-setBalance :: Set a -> Set a
+setBalance :: (Ord a) => Set a -> Set a
 setBalance SEmpty = SEmpty
 setBalance set@(SNode val h l r)
   | bf > 1 && setBalanceFactor l >= 0 = setRotateRight set
@@ -350,7 +350,7 @@ setSearch (SNode val h l r) target
 --
 --   Returns:
 --     * Int: Size of the set.
-setSize :: Set a -> Int
+setSize :: (Ord a) => Set a -> Int
 setSize SEmpty          = 0
 setSize (SNode _ _ l r) = 1 + setSize l + setSize r
 
@@ -364,7 +364,7 @@ setSize (SNode _ _ l r) = 1 + setSize l + setSize r
 --
 --   Returns:
 --     * [a]: List resulting of the set conversion
-setToList :: Set a -> [a]
+setToList :: (Ord a) => Set a -> [a]
 setToList SEmpty          = []
 setToList (SNode v _ l r) = setToList l ++ [v] ++ setToList r
 
@@ -375,7 +375,7 @@ setToList (SNode v _ l r) = setToList l ++ [v] ++ setToList r
 --   Arguments:
 --     * k: Type of the key.
 --     * v: Type of the value.
-data (Ord k) => MEntry k v = MEntry k v
+data MEntry k v = MEntry k v
   deriving (Show)
 
 instance (Ord k) => Eq (MEntry k v) where
@@ -391,7 +391,7 @@ instance (Ord k) => Ord (MEntry k v) where
 --   Arguments:
 --     * k: Type of the keys in the map.
 --     * v: Type of the values in the map.
-newtype (Ord k) => Map k v = Map (Set (MEntry k v))
+newtype Map k v = Map (Set (MEntry k v))
   deriving (Show, Eq)
 
 -- | Returns an empty map.
@@ -470,11 +470,11 @@ mapToList (Map (SNode (MEntry k v) _ l r)) = mapToList (Map l) ++ [(k, v)] ++ ma
 --
 --  Arguments:
 --   * a: Type of the values stored in the heap.
-data (Ord a) => Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
+data Heap a = HNode a Int (Heap a) (Heap a) | HEmpty
   deriving (Show, Eq)
 
 -- | Returns an empty heap.
-emptyHeap :: Heap a
+emptyHeap :: (Ord a) => Heap a
 emptyHeap = HEmpty
 
 -- | Returns the rank of a heap node.
