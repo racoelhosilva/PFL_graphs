@@ -249,7 +249,7 @@ prop_travelSalesPassesEachCityOnce :: GoodRoadMap -> Property
 prop_travelSalesPassesEachCityOnce (GoodRoadMap roadMap) = let
   circuit = travelSales roadMap
   mapCities = cities roadMap
-  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUnique (nub circuit) == sortUnique mapCities
+  in not (null circuit) ==> length circuit == length mapCities + 1 && sortUnique circuit == mapCities
 
 -- Auxiliary Functions 
 

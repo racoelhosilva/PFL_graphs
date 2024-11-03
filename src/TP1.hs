@@ -748,6 +748,18 @@ unjust :: Maybe a -> a
 unjust (Just x) = x
 unjust Nothing  = undefined
 
+-- | Checks if a Maybe value is Just and its value satisfies a predicate.
+--
+--   Arguments:
+--     * Maybe a: Maybe value to check.
+--     * (a -> Bool): Predicate to check the value.
+--
+--   Returns:
+--     * Bool: True if the value is Just and satisfies the predicate, False otherwise.
+isJustAnd :: Maybe a -> (a -> Bool) -> Bool
+isJustAnd (Just x) f = f x
+isJustAnd Nothing  _ = False
+
 {- Function Definitions -}
 
 -- | Returns all the cities of the roadmap.
@@ -1005,6 +1017,7 @@ shortestPath roadMap orig dest = case mapLookup pathMap dest of
     dijkstra :: Map City ShortestPaths -> Heap DijkstraState -> Map City ShortestPaths
     dijkstra predMap heap
       | heapIsEmpty heap = predMap
+      | longerThanShortest = predMap
       | otherwise = newMap
       where
         -- | Distance from the origin in the current state.
@@ -1017,13 +1030,18 @@ shortestPath roadMap orig dest = case mapLookup pathMap dest of
         restHeap :: Heap DijkstraState
         ((newDist, city, paths), restHeap) = heapPopMin heap
 
+        -- | Checks if the current state distance is longer than the shortest path
+        --   to the destination. This is only used to short-circuit the algorithm.
+        longerThanShortest :: Bool
+        longerThanShortest = isJustAnd (mapLookup predMap dest) (\(dist, _) -> newDist > dist)
+
         -- | Updated map of shortest paths to each city.
         newMap :: Map City ShortestPaths
         newMap = case mapLookup predMap city of
           Just (oldDist, oldPaths) ->
             case newDist `compare` oldDist of
               EQ -> dijkstra (mapInsert predMap city (newDist, paths ++ oldPaths)) restHeap
-              GT -> if city == dest then predMap else dijkstra predMap restHeap
+              GT -> dijkstra predMap restHeap
           Nothing -> dijkstra (mapInsert predMap city (newDist, paths)) updatedHeap
 
         -- | New heap of states, after analyzing all the adjacent cities and
