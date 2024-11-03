@@ -773,8 +773,7 @@ isJustAnd Nothing  _ = False
 --   Returns:
 --     * [City]: List of the cities (vertices) in the roadmap .
 cities :: RoadMap -> [City]
-cities [] = []
-cities r = sortUnique $ citySelect r
+cities roadMap = sortUnique $ citySelect roadMap
   where
     -- | Retrieves a list that, for each edge, contains both the start and end cities.
     --
@@ -787,8 +786,8 @@ cities r = sortUnique $ citySelect r
     --   Returns:
     --     * [City]: Sorted list of all cities taken from the start or end of the edges in the roadmap.
     citySelect :: RoadMap -> [City]
-    citySelect []               = []
-    citySelect ((a, b, _) : xs) = a : b : citySelect xs
+    citySelect [] = []
+    citySelect ((orig, dest, _) : subRoadMap) = orig : dest : citySelect subRoadMap
 
 -- | Checks if two cities are adjacent in a roadmap.
 --
