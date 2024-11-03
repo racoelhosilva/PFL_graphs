@@ -229,6 +229,11 @@ prop_pathDistanceDistributivity goodRoadMap@(GoodRoadMap roadMap) =
   forAllPaths goodRoadMap $ \(GoodPath path2) ->
     pathDistance roadMap (path1 ++ [middleCity] ++ path2) == (sum <$> sequence [pathDistance roadMap (path1 ++ [middleCity]), pathDistance roadMap ([middleCity] ++ path2)])
 
+prop_shortestPathCityToItself :: GoodRoadMap -> Property
+prop_shortestPathCityToItself goodRoadMap@(GoodRoadMap roadMap) =
+  forAllCities goodRoadMap $ \(GoodCity city) ->
+    shortestPath roadMap city city == [[city]]
+
 prop_shortestPathCorrectEnds :: GoodRoadMap -> Property
 prop_shortestPathCorrectEnds goodRoadMap@(GoodRoadMap roadMap) =
   forAllCities goodRoadMap $ \(GoodCity city1) ->
@@ -426,6 +431,9 @@ main = hspec $ do
 
     it "Checks if no path exists" $ do
       shortestPath gTest3 "0" "2" `shouldBe` []
+  
+    prop "Shortest path from a city to itself is the city"
+      prop_shortestPathCityToItself
 
     prop "Shortest paths start and end on the right cities"
       prop_shortestPathCorrectEnds
