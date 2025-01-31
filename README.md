@@ -149,3 +149,10 @@ main = hspec $ do
 ## References
 
 1. Fethi Rabhi and Guy Lapalme. *Algorithms: a functional programming approach.* Addison-Wesley, 2nd edition, 1999.
+
+---
+
+> Class: T06 Group: G09   
+> Final Grade: 20.0  
+> Professors: Daniel Castro Silva  
+> Created in October 2024 for PFL (Programação Funcional e em Lógica) [FEUP-L.EIC024]  
